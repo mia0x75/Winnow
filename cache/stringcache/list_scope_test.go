@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xERR0R/blocky/lists/parsers"
+	"github.com/mia0x75/denyzer/lists/parsers"
 )
 
 // TestListEntriesCannotWidenScope runs list lines through the production parser

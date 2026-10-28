@@ -19,17 +19,17 @@ coverage.txt
 coverage/
 denyzer
 
-# Denyzer UI dashboard (Next.js static export)
-ui/node_modules/
-ui/.next/
-ui/out/
-ui/next-env.d.ts
-ui/*.tsbuildinfo
-ui/generated-logs/
-ui/.reports/
-ui/.env
-ui/.env*.local
-ui/coverage/
+# Denyzer frontend dashboard (Next.js static export)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
+frontend/generated-logs/
+frontend/.reports/
+frontend/.env
+frontend/.env*.local
+frontend/coverage/
 
 # Compiled dashboard embed output (built by `make dashboard` into web/dashboard)
 # .gitkeep keeps the go:embed pattern compiling on a clean clone.

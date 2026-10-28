@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# ----------- stage: ui
+# ----------- stage: frontend
 # Build the dashboard static export (arch-independent) on the native build
 # platform. Bun needs a glibc base image, so this uses the official Bun image
 # rather than the Alpine Go build stage; the output is copied into
 # web/dashboard before the Go build so `go:embed` picks it up.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.2 AS ui
-WORKDIR /ui
-COPY ui/package.json ui/bun.lock ./
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.2 AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
-COPY ui/ ./
+COPY frontend/ ./
 RUN bun run build
 
 # ----------- stage: build
@@ -44,9 +44,9 @@ RUN go mod download
 # Copy source code after dependencies are cached
 COPY . .
 
-# Embed the dashboard built by the ui stage (the source tree only carries the
-# gitignored placeholder). Copied after COPY . . so it always wins.
-COPY --from=ui /ui/out ./web/dashboard/
+# Embed the dashboard built by the frontend stage (the source tree only
+# carries the gitignored placeholder). Copied after COPY . . so it always wins.
+COPY --from=frontend /frontend/out ./web/dashboard/
 
 # Arguments needed for build step only
 ARG VERSION

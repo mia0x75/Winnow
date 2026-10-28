@@ -32,12 +32,13 @@ GO_BUILD_LD_FLAGS:=\
 
 GO_BUILD_OUTPUT:=$(BIN_OUT_DIR)/$(BINARY_NAME)$(BINARY_SUFFIX)
 
-# Denyzer UI dashboard (Next.js static export), embedded into the Go binary via
-# go:embed from web/dashboard. Next exports into ui/out (Turbopack rejects a
-# distDir outside the project), then the exported files are copied into
-# web/dashboard; the directory is gitignored except for .gitkeep so a clean
-# clone can still compile the go:embed without the UI toolchain.
-UI_DIR?=ui
+# Denyzer frontend dashboard (Next.js static export), embedded into the Go
+# binary via go:embed from web/dashboard. Next exports into frontend/out
+# (Turbopack rejects a distDir outside the project), then the exported files
+# are copied into web/dashboard; the directory is gitignored except for
+# .gitkeep so a clean clone can still compile the go:embed without the
+# frontend toolchain.
+FRONTEND_DIR?=frontend
 DASHBOARD_OUT_DIR?=web/dashboard
 
 # define version of golangci-lint here. If defined in tools.go, go mod perfoms automatically downgrade to older version which doesn't work with golang >=1.18
@@ -101,20 +102,20 @@ generate-check: check-go ## Verify generated files (mocks, enums, config schema)
 	env -u GOOS -u GOARCH go generate ./...
 	@git diff --exit-code || { echo "generated files are out of date; run 'make generate' and commit the result"; exit 1; }
 
-dashboard: $(if $(GO_SKIP_DASHBOARD),,check-bun) ## Build the Denyzer UI dashboard (static export) into web/dashboard so it is embedded in the Go binary
+dashboard: $(if $(GO_SKIP_DASHBOARD),,check-bun) ## Build the Denyzer frontend dashboard (static export) into web/dashboard so it is embedded in the Go binary
 ifdef GO_SKIP_DASHBOARD
 	$(info skipping dashboard build (GO_SKIP_DASHBOARD is set))
 else
-	@test -d "$(UI_DIR)" || { echo "error: $(UI_DIR) does not exist"; exit 1; }
-	@echo "Installing UI dependencies..."
-	cd "$(UI_DIR)" && bun install
+	@test -d "$(FRONTEND_DIR)" || { echo "error: $(FRONTEND_DIR) does not exist"; exit 1; }
+	@echo "Installing frontend dependencies..."
+	cd "$(FRONTEND_DIR)" && bun install
 	@echo "Building static export..."
-	cd "$(UI_DIR)" && bun run build
+	cd "$(FRONTEND_DIR)" && bun run build
 	@echo "Copying export into $(DASHBOARD_OUT_DIR)..."
 	@# Replace generated files but keep the tracked placeholder so the go:embed
 	@# pattern keeps compiling on clean clones and git stays clean.
 	find "$(DASHBOARD_OUT_DIR)" -mindepth 1 ! -name .gitkeep -exec rm -rf {} +
-	cp -R "$(UI_DIR)/out/." "$(DASHBOARD_OUT_DIR)/"
+	cp -R "$(FRONTEND_DIR)/out/." "$(DASHBOARD_OUT_DIR)/"
 	touch "$(DASHBOARD_OUT_DIR)/.gitkeep"
 	@echo "Done. Dashboard embedded at $(DASHBOARD_OUT_DIR)."
 endif

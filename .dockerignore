@@ -2,9 +2,9 @@ bin
 dist
 site
 node_modules
-ui/node_modules
-ui/.next
-ui/out
+frontend/node_modules
+frontend/.next
+frontend/out
 web/dashboard
 .git
 .idea

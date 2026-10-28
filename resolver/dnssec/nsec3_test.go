@@ -3,7 +3,7 @@ package dnssec
 import (
 	"context"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

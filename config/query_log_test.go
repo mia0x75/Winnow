@@ -19,8 +19,7 @@ var _ = Describe("QueryLogConfig", func() {
 	BeforeEach(func() {
 		cfg = QueryLog{
 			Target:           "/dev/null",
-			Type:             QueryLogTypeCsvClient,
-			LogRetentionDays: 0,
+			Type:             QueryLogTypeSqlite,
 			CreationAttempts: 1,
 			CreationCooldown: Duration(time.Millisecond),
 		}
@@ -56,7 +55,7 @@ var _ = Describe("QueryLogConfig", func() {
 			cfg.LogConfig(logger)
 
 			Expect(hook.Calls).ShouldNot(BeEmpty())
-			Expect(hook.Messages).Should(ContainElement(ContainSubstring("logRetentionDays:")))
+			Expect(hook.Messages).Should(ContainElement(ContainSubstring("retention:")))
 			Expect(hook.Messages).Should(ContainElement(ContainSubstring("sudn:")))
 		})
 
@@ -67,21 +66,6 @@ var _ = Describe("QueryLogConfig", func() {
 
 			Expect(hook.Messages).Should(ContainElement(ContainSubstring("domains (3):")))
 		})
-
-		DescribeTable("secret censoring", func(target string) {
-			cfg.Type = QueryLogTypeMysql
-			cfg.Target = Secret(target)
-
-			cfg.LogConfig(logger)
-
-			Expect(hook.Calls).ShouldNot(BeEmpty())
-			Expect(hook.Messages).ShouldNot(ContainElement(ContainSubstring("password")))
-		},
-			Entry("without scheme", "user:password@localhost"),
-			Entry("with scheme", "scheme://user:password@localhost"),
-			Entry("no password", "localhost"),
-			Entry("not a URL", "invalid!://"),
-		)
 	})
 
 	Describe("ignore.domains parsing", func() {
@@ -95,24 +79,16 @@ var _ = Describe("QueryLogConfig", func() {
 	})
 
 	Describe("secret target handling", func() {
-		It("loads the target DSN from a file and censors it when logging", func() {
+		It("loads the target from a file", func() {
 			dir := GinkgoT().TempDir()
-			path := filepath.Join(dir, "dsn")
-			Expect(os.WriteFile(path, []byte("postgresql://u:secretpw@host/db\n"), 0o600)).Should(Succeed())
+			path := filepath.Join(dir, "dbpath")
+			Expect(os.WriteFile(path, []byte("/var/lib/denyzer/querylog.db\n"), 0o600)).Should(Succeed())
 
-			yamlStr := "type: postgresql\ntarget: file:" + path + "\n"
+			yamlStr := "type: sqlite\ntarget: file:" + path + "\n"
 
 			var qlCfg QueryLog
 			Expect(yaml.UnmarshalStrict([]byte(yamlStr), &qlCfg)).Should(Succeed())
-			Expect(qlCfg.Target.Reveal()).Should(Equal("postgresql://u:secretpw@host/db"))
-			Expect(qlCfg.censoredTarget()).ShouldNot(ContainSubstring("secretpw"))
-			Expect(qlCfg.censoredTarget()).Should(ContainSubstring(secretObfuscator))
-		})
-
-		It("censors the embedded password of an inline DSN", func() {
-			cfg := QueryLog{Type: QueryLogTypePostgresql, Target: "postgresql://u:secretpw@host/db"}
-			Expect(cfg.censoredTarget()).ShouldNot(ContainSubstring("secretpw"))
-			Expect(cfg.censoredTarget()).Should(ContainSubstring(secretObfuscator))
+			Expect(qlCfg.Target.Reveal()).Should(Equal("/var/lib/denyzer/querylog.db"))
 		})
 	})
 
@@ -121,6 +97,14 @@ var _ = Describe("QueryLogConfig", func() {
 			t, err := ParseQueryLogType("sqlite")
 			Expect(err).Should(Succeed())
 			Expect(t).Should(Equal(QueryLogTypeSqlite))
+		})
+
+		It("defaults to sqlite when the type is omitted", func() {
+			var cfg QueryLog
+			Expect(cfg.Type).Should(Equal(QueryLogTypeSqlite))
+
+			Expect(defaults.Set(&cfg)).Should(Succeed())
+			Expect(cfg.Type).Should(Equal(QueryLogTypeSqlite))
 		})
 	})
 

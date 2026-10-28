@@ -15,13 +15,8 @@ To print runtime configuration / statistics, you can send `SIGUSR1` signal to ru
     INFO server:      externalResolver = "upstream 'tcp+udp:192.168.178.1:53'"
     INFO server:      cache item count = 7
     INFO server: -> resolver: 'QueryLoggingResolver'
-    INFO server:      logDir= "/logs"
-    INFO server:      perClient = false
-    INFO server:      logRetentionDays= 7
-    INFO server: -> resolver: 'MetricsResolver'
-    INFO server:      metrics:
-    INFO server:        Enable = true
-    INFO server:        Path   = /metrics
+    INFO server:      type = sqlite
+    INFO server:      target= "querylog.db"
     INFO server: -> resolver: 'ConditionalUpstreamResolver'
     INFO server:      fritz.box = "parallel upstreams 'upstream 'tcp+udp:192.168.178.1:53''"
     INFO server: -> resolver: 'CustomDNSResolver'
@@ -37,7 +32,7 @@ To print runtime configuration / statistics, you can send `SIGUSR1` signal to ru
 
 !!! hint
 
-    To send a signal to a process you can use `kill -s USR1 <PID>` or `docker kill -s SIGUSR1 blocky` for docker setup
+    To send a signal to a process you can use `kill -s USR1 <PID>` or `docker kill -s SIGUSR1 denyzer` for docker setup
 
 ## Debug / Profiling
 
@@ -69,7 +64,7 @@ Some links/ideas for lists:
 
 !!! warning
 
-    DNS server provider has access to all your DNS queries (all visited domain names). Some DNS providers can use (tracking, analyzing, profiling etc.). It is recommended to use different DNS upstream servers in blocky to distribute your DNS queries over multiple providers.
+    DNS server provider has access to all your DNS queries (all visited domain names). Some DNS providers can use (tracking, analyzing, profiling etc.). It is recommended to use different DNS upstream servers in denyzer to distribute your DNS queries over multiple providers.
 
     Please read the description before using the DNS server as upstream. Some of them provide already an ad-blocker, some
     filters other content. If you use external DNS server with included ad-blocker, you can't choose which domains should be
@@ -97,15 +92,15 @@ This is only a small excerpt of all free available DNS servers and should only b
 
 ### Code repository
 
-Main: [:material-github:GitHub](https://github.com/0xERR0R/blocky)
+Main: [:material-github:GitHub](https://github.com/mia0x75/denyzer)
 
-Mirror: [:simple-codeberg:Codeberg](https://codeberg.org/0xERR0R/blocky)
+Mirror: [:simple-codeberg:Codeberg](https://codeberg.org/mia0x75/denyzer)
 
 ### Container Registry
 
-Main: [:material-docker:Docker Hub](https://hub.docker.com/r/spx01/blocky)
+Main: [:material-docker:Docker Hub](https://hub.docker.com/r/mia0x75/denyzer)
 
-Mirror: [:material-github:GitHub Container Registry](https://ghcr.io/0xerr0r/blocky)
+Mirror: [:material-github:GitHub Container Registry](https://ghcr.io/mia0x75/denyzer)
 
 ## Developer Information
 

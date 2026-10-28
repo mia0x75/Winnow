@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
@@ -12,9 +12,9 @@ import (
 
 var _ = Describe("Conditional DNS resolution tests", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -30,7 +30,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka2", e2eNet, `A google/NOERROR("A 5.6.7.8 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -45,7 +45,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 			It("Should use conditional upstream for specific domain", func(ctx context.Context) {
 				By("forwarding 'my.device.lan' to moka1", func() {
 					msg := util.NewMsgWithQuestion("my.device.lan.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("my.device.lan.", A, "1.2.3.4"),
@@ -55,7 +55,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 
 				By("forwarding 'google.com' to default upstream moka2", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "5.6.7.8"),
@@ -73,7 +73,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka2", e2eNet, `A my/NOERROR("A 5.6.7.8 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -88,7 +88,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 			It("Should use conditional upstream for any unqualifieddomain", func(ctx context.Context) {
 				By("forwarding 'my' to moka2", func() {
 					msg := util.NewMsgWithQuestion("my.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("my.", A, "5.6.7.8"),
@@ -98,7 +98,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 
 				By("forwarding 'google.com' to default upstream", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "1.2.3.4"),
@@ -116,7 +116,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka2", e2eNet, `A google/NOERROR("A 5.6.7.8 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -133,7 +133,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 			It("Should use conditional upstream for rewritten domain", func(ctx context.Context) {
 				By("forwarding 'my.device.home' to moka1 after rewrite to 'lan'", func() {
 					msg := util.NewMsgWithQuestion("my.device.home.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("my.device.home.", A, "1.2.3.4"),
@@ -143,7 +143,7 @@ var _ = Describe("Conditional DNS resolution tests", func() {
 
 				By("forwarding 'google.com' to default upstream moka2", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "5.6.7.8"),

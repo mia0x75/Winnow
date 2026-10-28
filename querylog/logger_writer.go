@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,6 +24,10 @@ func (d *LoggerWriter) Write(entry *LogEntry) {
 	d.logger.WithFields(fields).Infof("query resolved")
 }
 
+func (d *LoggerWriter) RecordError() {
+	// Nothing to do
+}
+
 func (d *LoggerWriter) CleanUp() {
 	// Nothing to do
 }
@@ -39,7 +43,7 @@ func LogEntryFields(entry *LogEntry) logrus.Fields {
 		"question_type":   entry.QuestionType,
 		"answer":          entry.Answer,
 		"duration_ms":     entry.DurationMs,
-		"instance":        entry.BlockyInstance,
+		"instance":        entry.DenyzerInstance,
 	})
 }
 

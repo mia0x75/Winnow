@@ -2,10 +2,9 @@ package e2e
 
 import (
 	"context"
-	"time"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -14,9 +13,9 @@ import (
 
 var _ = Describe("Caching configuration tests", func() {
 	var (
-		e2eNet        *testcontainers.DockerNetwork
-		blocky, mokka testcontainers.Container
-		err           error
+		e2eNet         *testcontainers.DockerNetwork
+		denyzer, mokka testcontainers.Container
+		err            error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -33,7 +32,7 @@ var _ = Describe("Caching configuration tests", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -51,7 +50,7 @@ var _ = Describe("Caching configuration tests", func() {
 				msg := util.NewMsgWithQuestion("short-ttl.com.", A)
 
 				By("First query should return response with minTime applied (5s)", func() {
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("short-ttl.com.", A, "1.2.3.4"),
@@ -62,7 +61,7 @@ var _ = Describe("Caching configuration tests", func() {
 
 				By("Wait for TTL to decrease", func() {
 					Eventually(func() uint32 {
-						resp, err := doDNSRequest(ctx, blocky, msg)
+						resp, err := doDNSRequest(ctx, denyzer, msg)
 						if err != nil {
 							return 0
 						}
@@ -79,7 +78,7 @@ var _ = Describe("Caching configuration tests", func() {
 				})
 
 				By("Second query should still return cached response (minTime=5s enforced)", func() {
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("short-ttl.com.", A, "1.2.3.4"),
@@ -88,7 +87,7 @@ var _ = Describe("Caching configuration tests", func() {
 				})
 
 				By("No warnings/errors in log", func() {
-					Expect(getContainerLogs(ctx, blocky)).Should(BeEmpty())
+					Expect(getContainerLogs(ctx, denyzer)).Should(BeEmpty())
 				})
 			})
 
@@ -96,7 +95,7 @@ var _ = Describe("Caching configuration tests", func() {
 				msg := util.NewMsgWithQuestion("long-ttl.com.", A)
 
 				By("First query should cap TTL at maxTime (30s)", func() {
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("long-ttl.com.", A, "5.6.7.8"),
@@ -105,71 +104,7 @@ var _ = Describe("Caching configuration tests", func() {
 				})
 
 				By("No warnings/errors in log", func() {
-					Expect(getContainerLogs(ctx, blocky)).Should(BeEmpty())
-				})
-			})
-		})
-	})
-
-	Describe("Cache Prefetching", func() {
-		When("prefetching is enabled", func() {
-			BeforeEach(func(ctx context.Context) {
-				mokka, err = createDNSMokkaContainer(ctx, "moka1", e2eNet,
-					`A prefetch.com/NOERROR("A 9.8.7.6 5")`,
-				)
-				Expect(err).Should(Succeed())
-
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
-					log:
-					  level: warn
-					upstreams:
-					  groups:
-					    default:
-					      - moka1
-					caching:
-					  prefetching: true
-					  prefetchThreshold: 3
-					  prefetchExpires: 2h
-					`))
-				Expect(err).Should(Succeed())
-			})
-
-			It("should prefetch frequently queried domains", func(ctx context.Context) {
-				msg := util.NewMsgWithQuestion("prefetch.com.", A)
-
-				By("Query domain multiple times to mark it for prefetching", func() {
-					for range 5 {
-						Expect(doDNSRequest(ctx, blocky, msg)).
-							Should(BeDNSRecord("prefetch.com.", A, "9.8.7.6"))
-						time.Sleep(500 * time.Millisecond) // Space out queries for prefetch detection
-					}
-				})
-
-				By("Wait for TTL to decrease below prefetch threshold (3s)", func() {
-					Eventually(func() uint32 {
-						resp, err := doDNSRequest(ctx, blocky, msg)
-						if err != nil {
-							return 999
-						}
-						if len(resp.Answer) > 0 {
-							return resp.Answer[0].Header().Ttl
-						}
-
-						return 999
-					}, "5s", "200ms").Should(BeNumerically("<=", 3))
-				})
-
-				By("Terminate upstream to verify prefetch occurred", func() {
-					Expect(mokka.Terminate(ctx)).Should(Succeed())
-				})
-
-				By("Query should still return cached/prefetched response", func() {
-					Expect(doDNSRequest(ctx, blocky, msg)).
-						Should(BeDNSRecord("prefetch.com.", A, "9.8.7.6"))
-				})
-
-				By("No warnings/errors in log", func() {
-					Expect(getContainerLogs(ctx, blocky)).Should(BeEmpty())
+					Expect(getContainerLogs(ctx, denyzer)).Should(BeEmpty())
 				})
 			})
 		})
@@ -184,7 +119,7 @@ var _ = Describe("Caching configuration tests", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -205,14 +140,14 @@ var _ = Describe("Caching configuration tests", func() {
 
 				By("Query both domains multiple times", func() {
 					// Query each domain twice to verify caching behavior
-					Expect(doDNSRequest(ctx, blocky, msgNocache)).
+					Expect(doDNSRequest(ctx, denyzer, msgNocache)).
 						Should(BeDNSRecord("nocache.example.com.", A, "1.1.1.1"))
-					Expect(doDNSRequest(ctx, blocky, msgNocache)).
+					Expect(doDNSRequest(ctx, denyzer, msgNocache)).
 						Should(BeDNSRecord("nocache.example.com.", A, "1.1.1.1"))
 
-					Expect(doDNSRequest(ctx, blocky, msgCached)).
+					Expect(doDNSRequest(ctx, denyzer, msgCached)).
 						Should(BeDNSRecord("cached.example.com.", A, "2.2.2.2"))
-					Expect(doDNSRequest(ctx, blocky, msgCached)).
+					Expect(doDNSRequest(ctx, denyzer, msgCached)).
 						Should(BeDNSRecord("cached.example.com.", A, "2.2.2.2"))
 				})
 
@@ -221,12 +156,12 @@ var _ = Describe("Caching configuration tests", func() {
 				})
 
 				By("Cached domain should return from cache", func() {
-					Expect(doDNSRequest(ctx, blocky, msgCached)).
+					Expect(doDNSRequest(ctx, denyzer, msgCached)).
 						Should(BeDNSRecord("cached.example.com.", A, "2.2.2.2"))
 				})
 
 				By("Excluded domain should return SERVFAIL (not cached)", func() {
-					resp, err := doDNSRequest(ctx, blocky, msgNocache)
+					resp, err := doDNSRequest(ctx, denyzer, msgNocache)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeServerFailure))
 				})
@@ -242,7 +177,7 @@ var _ = Describe("Caching configuration tests", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -259,7 +194,7 @@ var _ = Describe("Caching configuration tests", func() {
 				msg := util.NewMsgWithQuestion("nonexistent.com.", A)
 
 				By("First query should return NXDOMAIN", func() {
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 				})
@@ -269,13 +204,13 @@ var _ = Describe("Caching configuration tests", func() {
 				})
 
 				By("Second query should return cached NXDOMAIN", func() {
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 				})
 
 				By("No warnings/errors in log", func() {
-					Expect(getContainerLogs(ctx, blocky)).Should(BeEmpty())
+					Expect(getContainerLogs(ctx, denyzer)).Should(BeEmpty())
 				})
 			})
 		})
@@ -294,7 +229,7 @@ var _ = Describe("Caching configuration tests", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -310,7 +245,7 @@ var _ = Describe("Caching configuration tests", func() {
 			It("should respect maxItemsCount limit", func(ctx context.Context) {
 				// Exact LRU eviction order is a property of the cache library
 				// (covered by expiration-cache's own tests) and, with cache sharding,
-				// is intentionally approximate. blocky's e2e only verifies the
+				// is intentionally approximate. denyzer's e2e only verifies the
 				// integration: the count limit is enforced and cached entries are
 				// still served once the upstream is gone.
 				domains := []struct{ name, ip string }{
@@ -322,7 +257,7 @@ var _ = Describe("Caching configuration tests", func() {
 
 				By("Query 4 different domains, exceeding the cache limit of 3", func() {
 					for _, d := range domains {
-						Expect(doDNSRequest(ctx, blocky, util.NewMsgWithQuestion(d.name, A))).Should(
+						Expect(doDNSRequest(ctx, denyzer, util.NewMsgWithQuestion(d.name, A))).Should(
 							BeDNSRecord(d.name, A, d.ip))
 					}
 				})
@@ -333,14 +268,14 @@ var _ = Describe("Caching configuration tests", func() {
 
 				By("The most recently queried domain is still cached", func() {
 					// the newest entry is never the one evicted, regardless of sharding
-					Expect(doDNSRequest(ctx, blocky, util.NewMsgWithQuestion("domain4.com.", A))).Should(
+					Expect(doDNSRequest(ctx, denyzer, util.NewMsgWithQuestion("domain4.com.", A))).Should(
 						BeDNSRecord("domain4.com.", A, "4.4.4.4"))
 				})
 
 				By("maxItemsCount is enforced: not all earlier domains survive", func() {
 					cached := 0
 					for _, d := range domains[:3] {
-						resp, err := doDNSRequest(ctx, blocky, util.NewMsgWithQuestion(d.name, A))
+						resp, err := doDNSRequest(ctx, denyzer, util.NewMsgWithQuestion(d.name, A))
 						Expect(err).Should(Succeed())
 						if resp.Rcode == dns.RcodeSuccess && len(resp.Answer) > 0 {
 							cached++
@@ -352,7 +287,7 @@ var _ = Describe("Caching configuration tests", func() {
 				})
 
 				By("No warnings in log", func() {
-					logs, err := getContainerLogs(ctx, blocky)
+					logs, err := getContainerLogs(ctx, denyzer)
 					Expect(err).Should(Succeed())
 					for _, log := range logs {
 						Expect(log).ShouldNot(ContainSubstring("WARN"))

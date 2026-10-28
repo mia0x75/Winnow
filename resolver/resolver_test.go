@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/sirupsen/logrus"
 
 	. "github.com/onsi/ginkgo/v2"

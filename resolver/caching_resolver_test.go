@@ -6,14 +6,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xERR0R/blocky/cache"
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/evt"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/log"
-	. "github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/creasty/defaults"
+	"github.com/mia0x75/denyzer/cache"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/evt"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/log"
+	. "github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
@@ -25,7 +25,6 @@ var _ = Describe("CachingResolver", func() {
 	var (
 		sut        *CachingResolver
 		sutConfig  config.Caching
-		sutDNSSEC  config.DNSSEC
 		m          *mockResolver
 		mockAnswer *dns.Msg
 		ctx        context.Context
@@ -41,7 +40,6 @@ var _ = Describe("CachingResolver", func() {
 
 	BeforeEach(func() {
 		sutConfig = config.Caching{}
-		sutDNSSEC = config.DNSSEC{}
 		if err := defaults.Set(&sutConfig); err != nil {
 			panic(err)
 		}
@@ -52,7 +50,7 @@ var _ = Describe("CachingResolver", func() {
 		ctx, cancelFn = context.WithCancel(context.Background())
 		DeferCleanup(cancelFn)
 
-		sut, _ = NewCachingResolver(ctx, sutConfig, sutDNSSEC, nil)
+		sut, _ = NewCachingResolver(ctx, sutConfig, config.DNSSEC{})
 		m = &mockResolver{}
 		cacheMock = cache.NewMockExpiringCache[[]byte](GinkgoT())
 		m.On("Resolve", mock.Anything).Return(&Response{Res: mockAnswer}, nil)
@@ -87,103 +85,6 @@ var _ = Describe("CachingResolver", func() {
 	})
 
 	Describe("Caching responses", func() {
-		When("prefetching is enabled", func() {
-			BeforeEach(func() {
-				sutConfig = config.Caching{
-					Prefetching:       true,
-					PrefetchExpires:   config.Duration(time.Minute * 120),
-					PrefetchThreshold: 5,
-				}
-				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 2, A, "123.122.121.120")
-			})
-
-			It("should prefetch domain if query count > threshold", func() {
-				// prepare resolver, set smaller caching times for testing
-				prefetchThreshold := 5
-				configureCaches(ctx, sut, &sutConfig)
-
-				domainPrefetched := make(chan bool, 1)
-				prefetchHitDomain := make(chan bool, 1)
-				prefetchedCnt := make(chan int, 1)
-				Expect(Bus().SubscribeOnce(CachingPrefetchCacheHit, func(domain string) {
-					prefetchHitDomain <- true
-				})).Should(Succeed())
-				Expect(Bus().SubscribeOnce(CachingDomainPrefetched, func(domain string) {
-					domainPrefetched <- true
-				})).Should(Succeed())
-
-				Expect(Bus().SubscribeOnce(CachingDomainsToPrefetchCountChanged, func(cnt int) {
-					prefetchedCnt <- cnt
-				})).Should(Succeed())
-
-				// first request
-				_, _ = sut.Resolve(ctx, newRequest("example.com.", A))
-
-				// Domain is not prefetched
-				Expect(domainPrefetched).ShouldNot(Receive())
-
-				// Domain is in prefetched domain cache
-				Expect(prefetchedCnt).Should(Receive(Equal(1)))
-
-				// now query again > threshold
-				for range prefetchThreshold + 1 {
-					_, err := sut.Resolve(ctx, newRequest("example.com.", A))
-					Expect(err).Should(Succeed())
-				}
-
-				// now is this domain prefetched
-				Eventually(domainPrefetched, "6s").Should(Receive(Equal(true)))
-
-				// and it should hit from prefetch cache
-				Expect(sut.Resolve(ctx, newRequest("example.com.", A))).
-					Should(
-						SatisfyAll(
-							HaveResponseType(ResponseTypeCACHED),
-							HaveReturnCode(dns.RcodeSuccess),
-							BeDNSRecord("example.com.", A, "123.122.121.120"),
-							HaveTTL(BeNumerically("<=", 2)),
-						),
-					)
-				Eventually(prefetchHitDomain, "6s").Should(Receive(Equal(true)))
-			})
-
-			When("dnssec validation is enabled", func() {
-				BeforeEach(func() {
-					sutDNSSEC = config.DNSSEC{Validate: true}
-				})
-
-				It("sets the DO bit on prefetch reloads so a signed entry isn't replaced by an unsigned one", func() {
-					var reloadReqHadDO bool
-					m.ResolveFn = func(_ context.Context, req *Request) (*Response, error) {
-						opt := req.Req.IsEdns0()
-						reloadReqHadDO = opt != nil && opt.Do()
-
-						return &Response{Res: mockAnswer, RType: ResponseTypeRESOLVED}, nil
-					}
-
-					// reloadCacheEntry is the ReloadFn the prefetching cache invokes on expiry.
-					_, ttl := sut.reloadCacheEntry(ctx, util.GenerateCacheKey(A, "example.com."))
-
-					Expect(reloadReqHadDO).Should(BeTrue(), "prefetch reload must set the DO bit")
-					Expect(ttl).Should(BeNumerically(">", 0))
-				})
-			})
-
-			It("does not request DNSSEC records on prefetch reloads by default, keeping unsigned caches small", func() {
-				var reloadReqHadEdns bool
-				m.ResolveFn = func(_ context.Context, req *Request) (*Response, error) {
-					reloadReqHadEdns = req.Req.IsEdns0() != nil
-
-					return &Response{Res: mockAnswer, RType: ResponseTypeRESOLVED}, nil
-				}
-
-				_, ttl := sut.reloadCacheEntry(ctx, util.GenerateCacheKey(A, "example.com."))
-
-				Expect(reloadReqHadEdns).Should(BeFalse(),
-					"without dnssec.validate, prefetch reloads must stay EDNS-free as before")
-				Expect(ttl).Should(BeNumerically(">", 0))
-			})
-		})
 		When("caching with default values is enabled", func() {
 			BeforeEach(func() {
 				rr1, err := dns.NewRR(fmt.Sprintf("%s\t%d\tIN\t%s\t%s", "example.com.", 600, A, "1.2.3.4"))
@@ -235,6 +136,63 @@ var _ = Describe("CachingResolver", func() {
 						// still one call to upstream
 						g.Expect(m.Calls).Should(HaveLen(1))
 					}, "1s").Should(Succeed())
+				})
+			})
+		})
+		When("prefetching is enabled", func() {
+			BeforeEach(func() {
+				sutConfig = config.Caching{
+					Prefetching:       true,
+					PrefetchExpires:   config.Duration(time.Minute * 120),
+					PrefetchThreshold: 0,
+					MaxCachingTime:    config.Duration(time.Second),
+				}
+				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 1, A, "123.122.121.120")
+			})
+
+			It("should reload a hot domain through the cache loader", func() {
+				m.ResolveFn = func(_ context.Context, _ *Request) (*Response, error) {
+					return &Response{Res: mockAnswer, RType: ResponseTypeRESOLVED}, nil
+				}
+
+				domainPrefetched := make(chan bool, 1)
+				prefetchHitDomain := make(chan bool, 1)
+				Expect(Bus().SubscribeOnce(CachingDomainPrefetched, func(domain string) {
+					domainPrefetched <- true
+				})).Should(Succeed())
+				Expect(Bus().SubscribeOnce(CachingPrefetchCacheHit, func(domain string) {
+					prefetchHitDomain <- true
+				})).Should(Succeed())
+
+				By("priming the cache", func() {
+					Expect(sut.Resolve(ctx, newRequest("example.com.", A))).
+						Should(HaveResponseType(ResponseTypeRESOLVED))
+					Expect(m.Calls).Should(HaveLen(1))
+				})
+
+				By("waiting for the entry to expire", func() {
+					time.Sleep(1200 * time.Millisecond)
+				})
+
+				By("reloading the expired hot entry through the loader", func() {
+					// The first Get after expiry triggers the loader, which
+					// re-resolves upstream and serves the refreshed answer from cache.
+					Expect(sut.Resolve(ctx, newRequest("example.com.", A))).
+						Should(
+							SatisfyAll(
+								HaveResponseType(ResponseTypeCACHED),
+								BeDNSRecord("example.com.", A, "123.122.121.120"),
+							))
+					Eventually(domainPrefetched, "6s").Should(Receive(Equal(true)))
+					// the reload performed a second upstream query
+					Expect(m.Calls).Should(HaveLen(2))
+				})
+
+				By("reporting the prefetch hit", func() {
+					// The reloaded entry is then served from cache.
+					Expect(sut.Resolve(ctx, newRequest("example.com.", A))).
+						Should(HaveResponseType(ResponseTypeCACHED))
+					Eventually(prefetchHitDomain, "6s").Should(Receive(Equal(true)))
 				})
 			})
 		})
@@ -819,98 +777,6 @@ var _ = Describe("CachingResolver", func() {
 		})
 	})
 
-	Describe("reloadCacheEntry (prefetch reload)", func() {
-		var cacheKey string
-
-		BeforeEach(func() {
-			cacheKey = util.GenerateCacheKey(dns.Type(dns.TypeA), "example.com")
-		})
-
-		When("the reloaded response contains EDNS0 OPT records", func() {
-			BeforeEach(func() {
-				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 123, A, "1.2.3.4")
-				opt := new(dns.OPT)
-				opt.Hdr.Name = "."
-				opt.Hdr.Rrtype = dns.TypeOPT
-				opt.Option = append(opt.Option, &dns.EDNS0_COOKIE{Code: dns.EDNS0COOKIE, Cookie: "0102030405060708"})
-				mockAnswer.Extra = append(mockAnswer.Extra, opt)
-			})
-
-			It("strips the OPT records from the stored value", func() {
-				packed, ttl := sut.reloadCacheEntry(ctx, cacheKey)
-				Expect(packed).ShouldNot(BeNil())
-				Expect(ttl).Should(BeNumerically(">", 0))
-
-				msg := new(dns.Msg)
-				Expect(msg.Unpack(*packed)).Should(Succeed())
-				Expect(msg.Answer).Should(HaveLen(1))
-				Expect(msg.Extra).Should(BeEmpty())
-			})
-		})
-
-		When("the response is successful", func() {
-			BeforeEach(func() {
-				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 123, A, "1.2.3.4")
-			})
-
-			It("returns the packed value and TTL", func() {
-				packed, ttl := sut.reloadCacheEntry(ctx, cacheKey)
-				Expect(packed).ShouldNot(BeNil())
-				Expect(ttl).Should(BeNumerically(">", 0))
-
-				msg := new(dns.Msg)
-				Expect(msg.Unpack(*packed)).Should(Succeed())
-				Expect(msg.Answer).Should(HaveLen(1))
-			})
-		})
-
-		When("the reloaded response is truncated", func() {
-			BeforeEach(func() {
-				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 123, A, "1.2.3.4")
-				mockAnswer.Truncated = true
-			})
-
-			It("is not cached or published (matches putInCache's isResponseCacheable gate)", func() {
-				packed, ttl := sut.reloadCacheEntry(ctx, cacheKey)
-				Expect(packed).Should(BeNil())
-				Expect(ttl).Should(BeZero())
-			})
-		})
-
-		When("the reloaded response has the CD flag set", func() {
-			BeforeEach(func() {
-				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 123, A, "1.2.3.4")
-				mockAnswer.CheckingDisabled = true
-			})
-
-			It("is not cached or published (matches putInCache's isResponseCacheable gate)", func() {
-				packed, ttl := sut.reloadCacheEntry(ctx, cacheKey)
-				Expect(packed).Should(BeNil())
-				Expect(ttl).Should(BeZero())
-			})
-		})
-
-		When("a maximum caching time is configured", func() {
-			BeforeEach(func() {
-				sutConfig.MaxCachingTime = config.Duration(time.Minute)
-				mockAnswer, _ = util.NewMsgWithAnswer("example.com.", 3600, A, "1.2.3.4")
-			})
-
-			It("clamps the TTL baked into the packed value, not just the returned TTL", func() {
-				packed, ttl := sut.reloadCacheEntry(ctx, cacheKey)
-				Expect(packed).ShouldNot(BeNil())
-				Expect(ttl).Should(Equal(time.Minute))
-
-				msg := new(dns.Msg)
-				Expect(msg.Unpack(*packed)).Should(Succeed())
-				Expect(msg.Answer).Should(HaveLen(1))
-				// the clamped TTL must be packed, otherwise the stored/Redis-synced
-				// bytes would carry the raw upstream TTL (3600).
-				Expect(msg.Answer[0].Header().Ttl).Should(Equal(uint32(60)))
-			})
-		})
-	})
-
 	Context("isRequestCacheable", func() {
 		var request *Request
 		When("request is not cacheable", func() {
@@ -956,7 +822,7 @@ var _ = Describe("CachingResolver", func() {
 			sutConfig = config.Caching{Exclude: exclude}
 			mockAnswer, _ = util.NewMsgWithAnswer(domain, 1000, A, "10.0.0.1")
 			request = newRequest(domain, A)
-			sut, _ = NewCachingResolver(ctx, sutConfig, config.DNSSEC{}, nil)
+			sut, _ = NewCachingResolver(ctx, sutConfig, config.DNSSEC{})
 			m.On("Resolve", mock.Anything, mock.Anything).Return(&Response{Res: mockAnswer}, nil)
 			cacheMock.On("Get", mock.Anything).Maybe().Return((*[]byte)(nil), 10*time.Second)
 			cacheMock.On("Put", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
@@ -966,7 +832,7 @@ var _ = Describe("CachingResolver", func() {
 
 		When("Exclude settings are wrong", func() {
 			It("should fail", func() {
-				_, err := NewCachingResolver(ctx, config.Caching{Exclude: []string{"/[]/"}}, config.DNSSEC{}, nil)
+				_, err := NewCachingResolver(ctx, config.Caching{Exclude: []string{"/[]/"}}, config.DNSSEC{})
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("cache exclusion configuration '/[]/' fail because"))
 			})
@@ -974,7 +840,7 @@ var _ = Describe("CachingResolver", func() {
 
 		When("Exclude settings are wrong because of missing slashes", func() {
 			It("should fail", func() {
-				_, err := NewCachingResolver(ctx, config.Caching{Exclude: []string{"lan"}}, config.DNSSEC{}, nil)
+				_, err := NewCachingResolver(ctx, config.Caching{Exclude: []string{"lan"}}, config.DNSSEC{})
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("cache exclusion configuration 'lan' fail because of missing slashes"))
 			})

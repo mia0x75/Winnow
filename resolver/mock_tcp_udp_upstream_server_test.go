@@ -4,20 +4,20 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	"github.com/onsi/ginkgo/v2"
 )
 
 // answerFn builds the response for a received query. The mock fixes the response ID and the
 // response bit afterwards, so a handler is free to return a mismatched question section or set the
-// TC bit to exercise blocky's fallback logic.
+// TC bit to exercise denyzer's fallback logic.
 type answerFn func(request *dns.Msg) *dns.Msg
 
 // mockTCPUDPUpstreamServer is a test upstream that listens on a single address over BOTH UDP and
 // TCP, with independent handlers and per-protocol call counters. Unlike MockUDPUpstreamServer (UDP
-// only) it lets a test assert which transport blocky actually used — e.g. that TCP is never dialed
+// only) it lets a test assert which transport denyzer actually used — e.g. that TCP is never dialed
 // when the UDP answer is already clean.
 type mockTCPUDPUpstreamServer struct {
 	udpAnswer answerFn

@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/hashicorp/go-multierror"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 )
@@ -25,6 +25,10 @@ import (
 var errArbitrarySystemResolverRequest = errors.New(
 	"cannot resolve arbitrary requests using the system resolver",
 )
+
+// bootstrapMaxCacheTime bounds how long bootstrap lookups may be cached when
+// caching is otherwise disabled.
+const bootstrapMaxCacheTime = 24 * time.Hour
 
 type bootstrapConfig struct {
 	config.BootstrapDNS
@@ -87,20 +91,26 @@ func NewBootstrap(ctx context.Context, cfg *config.Config) (b *Bootstrap, err er
 	pbCfg := config.NewUpstreamGroup("<bootstrap>", cfg.Upstreams, nil)
 	pbCfg.Groups = nil // To be on the safe side it doesn't try to use anything besides the bootstrap
 
-	// Always enable prefetching to avoid stalling user requests
-	// Otherwise, a request to blocky could end up waiting for 2 DNS requests:
+	// Always cache bootstrap lookups to avoid stalling user requests.
+	// Otherwise, a request to denyzer could end up waiting for 2 DNS requests:
 	//   1. lookup the DNS server IP
 	//   2. forward the user request to the server looked-up in 1
 	cachingCfg := cfg.Caching
-	cachingCfg.EnablePrefetch()
+
+	if !cachingCfg.IsEnabled() {
+		// make sure the bootstrap resolver caches its lookups
+		cachingCfg.MaxCachingTime = config.Duration(bootstrapMaxCacheTime)
+	}
 
 	if !cachingCfg.MinCachingTime.IsAboveZero() {
-		// Set a min time in case the user didn't to avoid prefetching too often
+		// Keep bootstrap results cached for a while to avoid repeated lookups
 		cachingCfg.MinCachingTime = config.Duration(time.Hour)
 	}
 
 	b.bootstraped = bootstraped
-	cachingResolver, _ := newCachingResolver(ctx, cachingCfg, config.DNSSEC{}, nil, false)
+	// Bootstrap lookups are never DNSSEC-validated, so prefetch reloads don't
+	// need the DO bit.
+	cachingResolver, _ := newCachingResolver(ctx, cachingCfg, config.DNSSEC{})
 
 	b.resolver = Chain(
 		NewFilteringResolver(cfg.Filtering),
@@ -225,6 +235,7 @@ func (b *Bootstrap) dialContext(ctx context.Context, network, addr string) (net.
 	// family) instead of consuming the whole attempt — the standard dialer
 	// does this dual-stack fallback for us, but we bypass it by resolving the
 	// host ourselves and dialing a single address.
+	//nolint:gosec // load balancing does not require cryptographic randomness
 	rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
 
 	var dialErr *multierror.Error
@@ -378,7 +389,7 @@ const defaultDNSPort uint16 = 53
 // addResolvFileUpstreams reads nameservers from a resolv.conf(5) file and adds
 // one plain-DNS bootstrap upstream per nameserver to upstreamIPs. This lets
 // systems whose DHCP-provided resolvers live outside /etc/resolv.conf (e.g.
-// OpenWrt's /tmp/resolv.conf.auto) point blocky at the right file.
+// OpenWrt's /tmp/resolv.conf.auto) point denyzer at the right file.
 func (b *Bootstrap) addResolvFileUpstreams(
 	upstreamIPs bootstrapedResolvers, upstreamCfg config.BootstrappedUpstream,
 	upstreamsCfg config.Upstreams, logger *logrus.Entry,

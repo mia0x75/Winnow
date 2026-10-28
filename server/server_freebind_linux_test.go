@@ -6,7 +6,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/0xERR0R/blocky/config"
+	"github.com/mia0x75/denyzer/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

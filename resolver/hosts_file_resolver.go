@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/lists"
-	"github.com/0xERR0R/blocky/lists/parsers"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/ThinkChaos/parcour"
 	"github.com/ThinkChaos/parcour/jobgroup"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/lists"
+	"github.com/mia0x75/denyzer/lists/parsers"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 )

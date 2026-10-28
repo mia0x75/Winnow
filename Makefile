@@ -1,29 +1,47 @@
-.PHONY: all clean generate generate-check build test fuzz e2e-test e2e-test-coverage lint run fmt docker-build help check-tools
+.PHONY: all clean serve_docs generate generate-check dashboard build test race fuzz e2e-test e2e-test-coverage lint run fmt docker-build help check-tools check-go check-docker check-bun
 .DEFAULT_GOAL:=help
 
 VERSION?=$(shell git describe --always --tags)
 BUILD_TIME?=$(shell date --iso-8601=seconds)
 DOC_PATH?="main"
-DOCKER_IMAGE_NAME=spx01/blocky
+DOCKER_IMAGE_NAME=mia0x75/denyzer
 
-BINARY_NAME:=blocky
+BINARY_NAME:=denyzer
 BIN_OUT_DIR?=bin
 
 GOARCH?=$(shell go env GOARCH)
 GOARM?=$(shell go env GOARM)
 
-GO_BUILD_FLAGS?=-v
+# The SQLite driver is native, so every build needs CGO. Cross builds need an
+# explicit CGO_ENABLED=1 because Go disables cgo when GOARCH differs.
+CGO_ENABLED?=1
+export CGO_ENABLED
+
+GO_BUILD_FLAGS?=-v -trimpath
+# Extra linker flags, e.g. `-linkmode external -extldflags -static` for the
+# fully static container build. Kept as a separate variable so the default
+# local build stays dynamic and fast.
+EXTRA_LD_FLAGS?=
 GO_BUILD_LD_FLAGS:=\
 	-w \
 	-s \
-	-X github.com/0xERR0R/blocky/util.Version=${VERSION} \
-	-X github.com/0xERR0R/blocky/util.BuildTime=$(shell date -d "${BUILD_TIME}" '+%Y%m%d-%H%M%S') \
-	-X github.com/0xERR0R/blocky/util.Architecture=${GOARCH}${GOARM}
+	${EXTRA_LD_FLAGS} \
+	-X github.com/mia0x75/denyzer/util.Version=${VERSION} \
+	-X github.com/mia0x75/denyzer/util.BuildTime=$(shell date -d "${BUILD_TIME}" '+%Y%m%d-%H%M%S') \
+	-X github.com/mia0x75/denyzer/util.Architecture=${GOARCH}${GOARM}
 
 GO_BUILD_OUTPUT:=$(BIN_OUT_DIR)/$(BINARY_NAME)$(BINARY_SUFFIX)
 
+# Denyzer UI dashboard (Next.js static export), embedded into the Go binary via
+# go:embed from web/dashboard. Next exports into ui/out (Turbopack rejects a
+# distDir outside the project), then the exported files are copied into
+# web/dashboard; the directory is gitignored except for .gitkeep so a clean
+# clone can still compile the go:embed without the UI toolchain.
+UI_DIR?=ui
+DASHBOARD_OUT_DIR?=web/dashboard
+
 # define version of golangci-lint here. If defined in tools.go, go mod perfoms automatically downgrade to older version which doesn't work with golang >=1.18
-GOLANG_LINT_VERSION=v2.12.2
+GOLANG_LINT_VERSION=v2.13.2
 
 GINKGO_PROCS?=
 
@@ -44,7 +62,7 @@ export PATH=$(shell go env GOPATH)/bin:$(shell echo $$PATH)
 
 # Tool check functions
 define check_command
-	@which $(1) > /dev/null 2>&1 || { echo "Error: $(1) is required but not installed. $(2)"; exit 1; }
+	@which $(1) > /dev/null 2>&1 || { echo "Error: $(1) is required but not installed." $(2); exit 1; }
 endef
 
 define check_go_tool
@@ -53,6 +71,10 @@ endef
 
 check-go:
 	$(call check_command,go,"Please install Go from https://golang.org/doc/install")
+
+# The SQLite driver is native, so a C compiler is mandatory.
+check-cc:
+	$(call check_command,$(firstword $(CC)),"Please install a C compiler (gcc or clang); the SQLite driver needs CGO")
 
 check-docker:
 	$(call check_command,docker,"Please install Docker from https://docs.docker.com/get-docker/")
@@ -70,16 +92,38 @@ generate: check-go ## Go generate
 ifdef GO_SKIP_GENERATE
 	$(info skipping go generate)
 else
-	go tool mockery
-	go generate ./...
+	env -u GOOS -u GOARCH go tool mockery
+	env -u GOOS -u GOARCH go generate ./...
 endif
 
 generate-check: check-go ## Verify generated files (mocks, enums, config schema) are up to date
-	go tool mockery
-	go generate ./...
+	env -u GOOS -u GOARCH go tool mockery
+	env -u GOOS -u GOARCH go generate ./...
 	@git diff --exit-code || { echo "generated files are out of date; run 'make generate' and commit the result"; exit 1; }
 
-build: check-go generate ## Build binary
+dashboard: $(if $(GO_SKIP_DASHBOARD),,check-bun) ## Build the Denyzer UI dashboard (static export) into web/dashboard so it is embedded in the Go binary
+ifdef GO_SKIP_DASHBOARD
+	$(info skipping dashboard build (GO_SKIP_DASHBOARD is set))
+else
+	@test -d "$(UI_DIR)" || { echo "error: $(UI_DIR) does not exist"; exit 1; }
+	@echo "Installing UI dependencies..."
+	cd "$(UI_DIR)" && bun install
+	@echo "Building static export..."
+	cd "$(UI_DIR)" && bun run build
+	@echo "Copying export into $(DASHBOARD_OUT_DIR)..."
+	@# Replace generated files but keep the tracked placeholder so the go:embed
+	@# pattern keeps compiling on clean clones and git stays clean.
+	find "$(DASHBOARD_OUT_DIR)" -mindepth 1 ! -name .gitkeep -exec rm -rf {} +
+	cp -R "$(UI_DIR)/out/." "$(DASHBOARD_OUT_DIR)/"
+	touch "$(DASHBOARD_OUT_DIR)/.gitkeep"
+	@echo "Done. Dashboard embedded at $(DASHBOARD_OUT_DIR)."
+endif
+
+check-bun:
+	$(call check_command,bun,"Please install Bun from https://bun.sh/docs/installation")
+
+build: check-go check-cc generate dashboard ## Build binary
+	@mkdir -p $(BIN_OUT_DIR)
 	go build $(GO_BUILD_FLAGS) -ldflags="$(GO_BUILD_LD_FLAGS)" -o $(GO_BUILD_OUTPUT)
 ifdef BIN_USER
 	$(info setting owner of $(GO_BUILD_OUTPUT) to $(BIN_USER))
@@ -105,31 +149,31 @@ fuzz: check-go ## run each fuzz target for FUZZ_TIME (default 30s); e.g. make fu
 
 e2e-test: check-go check-docker ## run e2e tests
 	docker buildx build \
-		--build-arg VERSION=blocky-e2e \
+		--build-arg VERSION=denyzer-e2e \
 		--build-arg BUILD_TIME=${BUILD_TIME} \
 		--build-arg GOPROXY \
 		--network=host \
 		-o type=docker \
-		-t blocky-e2e \
+		-t denyzer-e2e \
 		.
 	go tool ginkgo ${GINKGO_E2E_PROCS} --label-filter="e2e" --timeout 15m --flake-attempts 1 e2e
 
 e2e-test-coverage: check-go check-docker ## run e2e tests with code coverage
 	@echo "Building coverage-instrumented Docker image..."
 	docker buildx build \
-		--build-arg VERSION=blocky-e2e-coverage \
+		--build-arg VERSION=denyzer-e2e-coverage \
 		--build-arg BUILD_TIME=${BUILD_TIME} \
 		--build-arg GOPROXY \
 		--build-arg OPTS="-cover" \
 		--network=host \
 		-o type=docker \
-		-t blocky-e2e-coverage \
+		-t denyzer-e2e-coverage \
 		.
 	@echo "Running e2e tests with coverage collection..."
 	@mkdir -p coverage/e2e
 	@rm -rf coverage/e2e/*
 	@chmod 777 coverage/e2e
-	BLOCKY_IMAGE=blocky-e2e-coverage GOCOVERDIR=$(PWD)/coverage/e2e \
+	DENYZER_IMAGE=denyzer-e2e-coverage GOCOVERDIR=$(PWD)/coverage/e2e \
 		go tool ginkgo ${GINKGO_E2E_PROCS} --label-filter="e2e" --timeout 15m --flake-attempts 1 e2e
 	@echo "Converting coverage data..."
 	go tool covdata textfmt -i=./coverage/e2e -o=coverage/e2e-coverage.out
@@ -175,8 +219,8 @@ run: build ## Build and run binary
 	./$(BIN_OUT_DIR)/$(BINARY_NAME)
 
 fmt: check-go ## gofmt and goimports all go files
-	go tool gofumpt -l -w -extra .
-	find . -name '*.go' -exec go tool goimports -w {} +
+	find . -type d \( -name node_modules -o -name vendor -o -name .git \) -prune -o -name '*.go' -print0 | xargs -0 -r go tool gofumpt -l -w -extra
+	find . -type d \( -name node_modules -o -name vendor -o -name .git \) -prune -o -name '*.go' -print0 | xargs -0 -r go tool goimports -w
 
 docker-build: check-docker generate ## Build docker image
 	docker buildx build \

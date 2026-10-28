@@ -11,7 +11,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.repository_owner == '0xERR0R'
+    if: github.repository_owner == 'mia0x75'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -24,6 +24,11 @@ jobs:
           go-version-file: go.mod
         id: go
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
       - name: Build
         run: make build
 
@@ -34,7 +39,7 @@ jobs:
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v6
         with:
-          images: spx01/blocky,ghcr.io/0xerr0r/blocky
+          images: mia0x75/denyzer,ghcr.io/mia0x75/denyzer
 
       # No QEMU needed: the image is built by cross-compiling on the native
       # build platform (see Dockerfile), nothing runs in the target arch.

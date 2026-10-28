@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
 
 	"github.com/miekg/dns"
 	"github.com/onsi/ginkgo/v2"

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	"github.com/onsi/ginkgo/v2"
 )
@@ -26,7 +26,7 @@ type dohConnKey struct{}
 // upstream client copes with connections the server has closed.
 //
 // A request arriving on a *poisoned* connection is answered by closing that
-// connection without a response. That is what blocky sees when it sends a query
+// connection without a response. That is what denyzer sees when it sends a query
 // over a keep-alive connection the upstream has already closed: the write lands
 // in a dead socket and the read returns EOF, with the query never served.
 // KillOpenConns poisons every connection currently open, modelling an upstream
@@ -223,7 +223,7 @@ func (m *MockDoHUpstreamServer) Close() {
 // requests fail that way; every later one goes out on a connection reported as
 // fresh and is answered normally.
 //
-// MockDoHUpstreamServer cannot cover a retry that is itself stale: blocky
+// MockDoHUpstreamServer cannot cover a retry that is itself stale: denyzer
 // empties its own keep-alive pool between attempts, so over HTTP/1.1 a retry
 // there always dials fresh. A retry lands on a stale connection only when a
 // connection is returned to the pool concurrently, or when HTTP/2 keeps a stale

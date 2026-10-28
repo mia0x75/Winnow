@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xERR0R/blocky/lists/parsers"
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/lists/parsers"
+	"github.com/mia0x75/denyzer/log"
 )
 
 var (
@@ -65,8 +65,8 @@ func init() {
 
 // --- Cache Building ---
 //
-// Most memory efficient: Wildcard (blocky/trie    radix) because of peak
-// Fastest:               Wildcard (blocky/trie original)
+// Most memory efficient: Wildcard (denyzer/trie    radix) because of peak
+// Fastest:               Wildcard (denyzer/trie original)
 //
 // BenchmarkRegexFactory-8                1     1 253 023 507 ns/op   430.60 fact_heap_MB   430.60 peak_heap_MB   1 792 669 024 B/op   9 826 986 allocs/op
 // BenchmarkStringFactory-8               7       163 969 933 ns/op    11.79 fact_heap_MB    26.91 peak_heap_MB      67 613 890 B/op       1 306 allocs/op
@@ -169,8 +169,8 @@ func benchmarkFactory(b *testing.B, data []string, newFactory func() cacheFactor
 
 // --- Cache Querying ---
 //
-// Most memory efficient: Wildcard (blocky/trie radix)
-// Fastest:               Wildcard (blocky/trie original)
+// Most memory efficient: Wildcard (denyzer/trie radix)
+// Fastest:               Wildcard (denyzer/trie original)
 //
 // BenchmarkStringCache-8                 6       204 754 798 ns/op    15.11 cache_heap_MB              0 B/op          0 allocs/op
 // BenchmarkWildcardCache-8              14        76 186 334 ns/op    16.61 cache_heap_MB              0 B/op          0 allocs/op (original)

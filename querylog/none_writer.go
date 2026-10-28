@@ -10,6 +10,10 @@ func (d *NoneWriter) Write(*LogEntry) {
 	// Nothing to do
 }
 
+func (d *NoneWriter) RecordError() {
+	// Nothing to do
+}
+
 func (d *NoneWriter) CleanUp() {
 	// Nothing to do
 }

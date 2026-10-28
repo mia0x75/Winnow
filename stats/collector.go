@@ -1,5 +1,7 @@
-// Package stats provides an in-memory, bounded aggregation of DNS activity
-// over a rolling 24h window. It has no dependency on resolvers or HTTP.
+// Package stats provides an in-memory, bounded aggregation of DNS activity.
+// The curated summary is all-time cumulative since start; per-hour and top-N
+// data are bounded by a rolling 24h window. It has no dependency on resolvers
+// or HTTP.
 package stats
 
 import (
@@ -8,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/model"
 )
 
 const (
@@ -52,7 +54,7 @@ type NameCount struct {
 	Count int
 }
 
-// Summary holds the curated outcome categories over the window.
+// Summary holds the curated outcome categories, cumulative since start.
 type Summary struct {
 	Queries       int
 	Cached        int
@@ -121,6 +123,17 @@ func newBucket(hourStart time.Time) *bucket {
 	}
 }
 
+// lifetime holds all-time cumulative counters that back the summary. They are
+// updated on every Record and never evicted, so the summary grows monotonically
+// while the service runs, while the per-hour series and top-N lists stay
+// bounded by the 24h window.
+type lifetime struct {
+	byResponseType map[string]int
+	dropped        int
+	errs           int
+	durationSumMs  int64
+}
+
 // Collector aggregates samples into hourly buckets with a 24h sliding window.
 type Collector struct {
 	mu           sync.RWMutex
@@ -130,6 +143,7 @@ type Collector struct {
 	cacheEntries int
 	lists        ListCounts
 	now          func() time.Time
+	lifetime     lifetime
 }
 
 // NewCollector returns a Collector using the wall clock.
@@ -139,7 +153,8 @@ func NewCollector() *Collector {
 
 func newCollectorWithClock(now func() time.Time) *Collector {
 	return &Collector{
-		buckets: map[string]*bucket{},
+		buckets:  map[string]*bucket{},
+		lifetime: lifetime{byResponseType: map[string]int{}},
 		// Normalize to UTC so every timestamp the API reports (start/end/perHour)
 		// is in a single zone, consistent with the UTC-keyed buckets.
 		startTime: now().UTC(),
@@ -159,6 +174,7 @@ func (c *Collector) Record(s Sample) {
 	// errors have no meaningful "response" latency.
 	if s.Disposition == DispositionAnswered {
 		b.durationSumMs += s.DurationMs
+		c.lifetime.durationSumMs += s.DurationMs
 	}
 
 	if s.QType != "" {
@@ -180,11 +196,14 @@ func (c *Collector) Record(s Sample) {
 	switch s.Disposition {
 	case DispositionDropped:
 		b.dropped++
+		c.lifetime.dropped++
 	case DispositionErrored:
 		b.errors++
+		c.lifetime.errs++
 	case DispositionAnswered:
 		if s.RType != "" {
 			b.byResponseType[s.RType]++
+			c.lifetime.byResponseType[s.RType]++
 		}
 
 		if s.RCode != "" {
@@ -298,7 +317,6 @@ type liveAggregate struct {
 	byResponseType, byQueryType, byResponseCode map[string]int
 	domains, blockedDomains, clients            map[string]int
 	hourly                                      []*bucket
-	durationSum                                 int64
 	dropped, errs                               int
 	oldest                                      time.Time
 }
@@ -330,7 +348,6 @@ func (c *Collector) mergeLiveBuckets(now time.Time) liveAggregate {
 		addInto(agg.clients, b.clients)
 		agg.dropped += b.dropped
 		agg.errs += b.errors
-		agg.durationSum += b.durationSumMs
 		agg.hourly = append(agg.hourly, b)
 
 		if agg.oldest.IsZero() || b.hourStart.Before(agg.oldest) {
@@ -350,7 +367,11 @@ func (c *Collector) Snapshot() Result {
 	agg := c.mergeLiveBuckets(now)
 
 	res := Result{
-		Summary:           curatedSummary(agg.byResponseType, agg.dropped, agg.errs, agg.durationSum),
+		// The summary is all-time cumulative since the collector was created;
+		// the per-hour series and top-N lists below stay bounded by the window.
+		Summary: curatedSummary(
+			c.lifetime.byResponseType, c.lifetime.dropped, c.lifetime.errs, c.lifetime.durationSumMs,
+		),
 		ByResponseType:    agg.byResponseType,
 		ByQueryType:       agg.byQueryType,
 		ByResponseCode:    agg.byResponseCode,
@@ -424,13 +445,13 @@ func categorize(rtype string) responseCategory {
 // isBlockedRType reports whether a response type is a true block: a denylist hit
 // (BLOCKED) or a rebinding-protection hit (REBIND). It gates the Top Blocked table
 // only — the summary and the per-hour series categorize on their own — so the
-// domains it admits are exactly those blocky blocked. Query-type-filtered / NOTFQDN
+// domains it admits are exactly those denyzer blocked. Query-type-filtered / NOTFQDN
 // responses (#2151) and DNSSEC failures are none of them, and stay out.
 func isBlockedRType(rtype string) bool {
 	return categorize(rtype) == categoryBlocked
 }
 
-// curatedSummary maps the raw per-RType counts into blocky's outcome categories.
+// curatedSummary maps the raw per-RType counts into denyzer's outcome categories.
 // Queries counts every answered response (even one whose type maps to no named
 // category) plus drops and errors, so a future model.ResponseType can never
 // silently vanish from the total. answeredDurationSum already excludes

@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
-	"github.com/0xERR0R/blocky/api"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/api"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/spf13/cobra"
 )
 
@@ -27,19 +26,19 @@ const (
 	defaultPort         = 4000
 	defaultHost         = "localhost"
 	defaultConfigPath   = "./config.yml"
-	configFileEnvVar    = "BLOCKY_CONFIG_FILE"
+	configFileEnvVar    = "DENYZER_CONFIG_FILE"
 	configFileEnvVarOld = "CONFIG_FILE"
 )
 
 // NewRootCommand creates a new root cli command instance
 func NewRootCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "blocky",
-		Short: "blocky is a DNS proxy ",
+		Use:   "denyzer",
+		Short: "denyzer is a DNS proxy ",
 		Long: `A fast and configurable DNS Proxy
 and ad-blocker for local network.
 
-Complete documentation is available at https://github.com/0xERR0R/blocky`,
+Complete documentation is available at https://github.com/mia0x75/denyzer`,
 		PreRunE: initConfigPreRun,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return newServeCommand().RunE(cmd, args)
@@ -48,8 +47,8 @@ Complete documentation is available at https://github.com/0xERR0R/blocky`,
 	}
 
 	c.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath, "path to config file or folder")
-	c.PersistentFlags().StringVar(&apiHost, "apiHost", defaultHost, "host of blocky (API). Default overridden by config and CLI.") //nolint:lll
-	c.PersistentFlags().Uint16Var(&apiPort, "apiPort", defaultPort, "port of blocky (API). Default overridden by config and CLI.") //nolint:lll
+	c.PersistentFlags().StringVar(&apiHost, "apiHost", defaultHost, "host of denyzer (API). Default overridden by config and CLI.") //nolint:lll
+	c.PersistentFlags().Uint16Var(&apiPort, "apiPort", defaultPort, "port of denyzer (API). Default overridden by config and CLI.") //nolint:lll
 
 	c.AddCommand(newRefreshCommand(),
 		NewQueryCommand(),
@@ -57,9 +56,9 @@ Complete documentation is available at https://github.com/0xERR0R/blocky`,
 		newServeCommand(),
 		newBlockingCommand(),
 		NewListsCommand(),
+		newStatsCommand(),
 		NewHealthcheckCommand(),
 		newCacheCommand(),
-		NewStatsCommand(),
 		NewValidateCommand())
 
 	return c
@@ -104,15 +103,18 @@ func initConfig() error {
 	log.Configure(&cfg.Log)
 
 	if len(cfg.Ports.HTTP) != 0 {
-		split := strings.Split(cfg.Ports.HTTP[0], ":")
-
-		lastIdx := len(split) - 1
-
-		apiHost = strings.Join(split[:lastIdx], ":")
-
-		port, err := config.ConvertPort(split[lastIdx])
+		host, port, err := splitListenAddress(cfg.Ports.HTTP[0])
 		if err != nil {
-			return fmt.Errorf("can't convert port '%s' to number (1 - 65535): %w", split[lastIdx], err)
+			return fmt.Errorf("can't parse HTTP listen address '%s': %w", cfg.Ports.HTTP[0], err)
+		}
+
+		// An entry without a host (e.g. ":4004" or "4004") means "all
+		// interfaces" for the server, but the CLI must connect somewhere:
+		// default to localhost. A wildcard host (0.0.0.0/::) is not dialable.
+		if host == "" || (net.ParseIP(host) != nil && net.ParseIP(host).IsUnspecified()) {
+			apiHost = defaultHost
+		} else {
+			apiHost = host
 		}
 
 		apiPort = port

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
+	"github.com/mia0x75/denyzer/config"
 )
 
 type SourceOpener interface {

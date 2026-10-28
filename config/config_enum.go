@@ -125,13 +125,13 @@ func (IPVersion) EnumValues() []string {
 
 const (
 	// InitStrategyBlocking is a InitStrategy of type Blocking.
-	// Initialization runs before DNS resolution starts; errors are logged but Blocky keeps running if possible.
+	// Initialization runs before DNS resolution starts; errors are logged but Denyzer keeps running.
 	InitStrategyBlocking InitStrategy = iota
 	// InitStrategyFailOnError is a InitStrategy of type FailOnError.
-	// Like blocking but Blocky exits with an error if initialization fails.
+	// Like blocking but Denyzer exits with an error if initialization fails.
 	InitStrategyFailOnError
 	// InitStrategyFast is a InitStrategy of type Fast.
-	// Blocky serves DNS immediately and runs initialization in the background.
+	// Denyzer serves DNS immediately and runs initialization in the background.
 	InitStrategyFast
 )
 
@@ -224,9 +224,9 @@ func (x *InitStrategy) AppendText(b []byte) ([]byte, error) {
 // `// comment` in the ENUM(...) declaration. Generated; do not edit.
 func (InitStrategy) EnumDescriptions() map[string]string {
 	return map[string]string{
-		"blocking":    "Initialization runs before DNS resolution starts; errors are logged but Blocky keeps running if possible.",
-		"failOnError": "Like blocking but Blocky exits with an error if initialization fails.",
-		"fast":        "Blocky serves DNS immediately and runs initialization in the background.",
+		"blocking":    "Initialization runs before DNS resolution starts; errors are logged but Denyzer keeps running.",
+		"failOnError": "Like blocking but Denyzer exits with an error if initialization fails.",
+		"fast":        "Denyzer serves DNS immediately and runs initialization in the background.",
 	}
 }
 
@@ -566,49 +566,25 @@ func (QueryLogField) EnumValues() []string {
 }
 
 const (
+	// QueryLogTypeSqlite is a QueryLogType of type Sqlite.
+	// Log each query to a local SQLite database file (default).
+	QueryLogTypeSqlite QueryLogType = iota
 	// QueryLogTypeConsole is a QueryLogType of type Console.
-	// Log to console output (used when no type is set).
-	QueryLogTypeConsole QueryLogType = iota
+	// Log to console output; the dashboard has no data.
+	QueryLogTypeConsole
 	// QueryLogTypeNone is a QueryLogType of type None.
 	// Do not log any queries.
 	QueryLogTypeNone
-	// QueryLogTypeMysql is a QueryLogType of type Mysql.
-	// Log each query to an external MySQL or MariaDB database.
-	QueryLogTypeMysql
-	// QueryLogTypePostgresql is a QueryLogType of type Postgresql.
-	// Log each query to an external PostgreSQL database.
-	QueryLogTypePostgresql
-	// QueryLogTypeCsv is a QueryLogType of type Csv.
-	// Log to a CSV file (one per day).
-	QueryLogTypeCsv
-	// QueryLogTypeCsvClient is a QueryLogType of type Csv-Client.
-	// Log to a CSV file (one per day and per client).
-	QueryLogTypeCsvClient
-	// QueryLogTypeTimescale is a QueryLogType of type Timescale.
-	// Log each query to an external Timescale database.
-	QueryLogTypeTimescale
-	// QueryLogTypeSqlite is a QueryLogType of type Sqlite.
-	// Log each query to a local SQLite database file.
-	QueryLogTypeSqlite
-	// QueryLogTypeDnstap is a QueryLogType of type Dnstap.
-	// Export query/response events via dnstap (Frame Streams).
-	QueryLogTypeDnstap
 )
 
 var ErrInvalidQueryLogType = fmt.Errorf("not a valid QueryLogType, try [%s]", strings.Join(_QueryLogTypeNames, ", "))
 
-const _QueryLogTypeName = "consolenonemysqlpostgresqlcsvcsv-clienttimescalesqlitednstap"
+const _QueryLogTypeName = "sqliteconsolenone"
 
 var _QueryLogTypeNames = []string{
-	_QueryLogTypeName[0:7],
-	_QueryLogTypeName[7:11],
-	_QueryLogTypeName[11:16],
-	_QueryLogTypeName[16:26],
-	_QueryLogTypeName[26:29],
-	_QueryLogTypeName[29:39],
-	_QueryLogTypeName[39:48],
-	_QueryLogTypeName[48:54],
-	_QueryLogTypeName[54:60],
+	_QueryLogTypeName[0:6],
+	_QueryLogTypeName[6:13],
+	_QueryLogTypeName[13:17],
 }
 
 // QueryLogTypeNames returns a list of possible string values of QueryLogType.
@@ -621,28 +597,16 @@ func QueryLogTypeNames() []string {
 // QueryLogTypeValues returns a list of the values for QueryLogType
 func QueryLogTypeValues() []QueryLogType {
 	return []QueryLogType{
+		QueryLogTypeSqlite,
 		QueryLogTypeConsole,
 		QueryLogTypeNone,
-		QueryLogTypeMysql,
-		QueryLogTypePostgresql,
-		QueryLogTypeCsv,
-		QueryLogTypeCsvClient,
-		QueryLogTypeTimescale,
-		QueryLogTypeSqlite,
-		QueryLogTypeDnstap,
 	}
 }
 
 var _QueryLogTypeMap = map[QueryLogType]string{
-	QueryLogTypeConsole:    _QueryLogTypeName[0:7],
-	QueryLogTypeNone:       _QueryLogTypeName[7:11],
-	QueryLogTypeMysql:      _QueryLogTypeName[11:16],
-	QueryLogTypePostgresql: _QueryLogTypeName[16:26],
-	QueryLogTypeCsv:        _QueryLogTypeName[26:29],
-	QueryLogTypeCsvClient:  _QueryLogTypeName[29:39],
-	QueryLogTypeTimescale:  _QueryLogTypeName[39:48],
-	QueryLogTypeSqlite:     _QueryLogTypeName[48:54],
-	QueryLogTypeDnstap:     _QueryLogTypeName[54:60],
+	QueryLogTypeSqlite:  _QueryLogTypeName[0:6],
+	QueryLogTypeConsole: _QueryLogTypeName[6:13],
+	QueryLogTypeNone:    _QueryLogTypeName[13:17],
 }
 
 // String implements the Stringer interface.
@@ -661,15 +625,9 @@ func (x QueryLogType) IsValid() bool {
 }
 
 var _QueryLogTypeValue = map[string]QueryLogType{
-	_QueryLogTypeName[0:7]:   QueryLogTypeConsole,
-	_QueryLogTypeName[7:11]:  QueryLogTypeNone,
-	_QueryLogTypeName[11:16]: QueryLogTypeMysql,
-	_QueryLogTypeName[16:26]: QueryLogTypePostgresql,
-	_QueryLogTypeName[26:29]: QueryLogTypeCsv,
-	_QueryLogTypeName[29:39]: QueryLogTypeCsvClient,
-	_QueryLogTypeName[39:48]: QueryLogTypeTimescale,
-	_QueryLogTypeName[48:54]: QueryLogTypeSqlite,
-	_QueryLogTypeName[54:60]: QueryLogTypeDnstap,
+	_QueryLogTypeName[0:6]:   QueryLogTypeSqlite,
+	_QueryLogTypeName[6:13]:  QueryLogTypeConsole,
+	_QueryLogTypeName[13:17]: QueryLogTypeNone,
 }
 
 // ParseQueryLogType attempts to convert a string to a QueryLogType.
@@ -708,15 +666,9 @@ func (x *QueryLogType) AppendText(b []byte) ([]byte, error) {
 // `// comment` in the ENUM(...) declaration. Generated; do not edit.
 func (QueryLogType) EnumDescriptions() map[string]string {
 	return map[string]string{
-		"console":    "Log to console output (used when no type is set).",
-		"none":       "Do not log any queries.",
-		"mysql":      "Log each query to an external MySQL or MariaDB database.",
-		"postgresql": "Log each query to an external PostgreSQL database.",
-		"csv":        "Log to a CSV file (one per day).",
-		"csv-client": "Log to a CSV file (one per day and per client).",
-		"timescale":  "Log each query to an external Timescale database.",
-		"sqlite":     "Log each query to a local SQLite database file.",
-		"dnstap":     "Export query/response events via dnstap (Frame Streams).",
+		"sqlite":  "Log each query to a local SQLite database file (default).",
+		"console": "Log to console output; the dashboard has no data.",
+		"none":    "Do not log any queries.",
 	}
 }
 

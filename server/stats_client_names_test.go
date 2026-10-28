@@ -5,12 +5,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xERR0R/blocky/api"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/resolver"
-	"github.com/0xERR0R/blocky/stats"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/api"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/resolver"
+	"github.com/mia0x75/denyzer/stats"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
@@ -24,7 +24,7 @@ import (
 var _ = Describe("Client identity for queries answered at the head of the chain", func() {
 	const clientName = "laptop"
 
-	var clientIP = net.ParseIP("192.168.1.11")
+	clientIP := net.ParseIP("192.168.1.11")
 
 	newServer := func(ctx context.Context, adapt func(cfg *config.Config)) *Server {
 		GinkgoHelper()

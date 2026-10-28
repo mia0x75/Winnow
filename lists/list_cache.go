@@ -11,13 +11,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/0xERR0R/blocky/cache/stringcache"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/lists/parsers"
-	"github.com/0xERR0R/blocky/log"
 	"github.com/ThinkChaos/parcour"
 	"github.com/ThinkChaos/parcour/jobgroup"
+	"github.com/mia0x75/denyzer/cache/stringcache"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/lists/parsers"
+	"github.com/mia0x75/denyzer/log"
 )
 
 const (
@@ -119,6 +119,17 @@ func logger() *logrus.Entry {
 // the domain is not in any of the groups.
 func (b *ListCache) Match(domain string, groupsToCheck []string) (matches map[string]string) {
 	return b.groupedCache.Contains(domain, groupsToCheck)
+}
+
+// Counts returns the number of cached entries per group.
+func (b *ListCache) Counts() map[string]int {
+	counts := make(map[string]int, len(b.groupSources))
+
+	for group := range b.groupSources {
+		counts[group] = b.groupedCache.ElementCount(group) + b.regexCache.ElementCount(group)
+	}
+
+	return counts
 }
 
 // Refresh triggers the refresh of a list
@@ -233,7 +244,7 @@ func (b *ListCache) createCacheForGroup(
 }
 
 // seedFromDisk pre-populates each group's cache from locally-available sources, so
-// blocky can answer queries before the first network refresh completes. HTTP sources
+// denyzer can answer queries before the first network refresh completes. HTTP sources
 // are seeded from their on-disk download copy (when present); inline and file sources
 // are already local and seeded directly. It reuses the same parallel import path as a
 // normal refresh and is best-effort: groups or sources without local data are skipped

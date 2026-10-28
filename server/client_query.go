@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 )
 
@@ -80,8 +80,8 @@ func (q clientQuery) normalizeResponse(res *dns.Msg) {
 		// don't return an OPT record to a client that didn't use EDNS0 (RFC 6891 section 7)
 		util.RemoveEdns0Record(res)
 	} else if opt := res.IsEdns0(); opt != nil {
-		// Blocky doesn't implement DNS Cookies (RFC 7873), so a Server Cookie in the response is
-		// one an upstream issued for blocky itself, and blocky can't validate it when the client
+		// Denyzer doesn't implement DNS Cookies (RFC 7873), so a Server Cookie in the response is
+		// one an upstream issued for denyzer itself, and denyzer can't validate it when the client
 		// returns it. Passing it on also makes the presence of a cookie depend on which upstream
 		// answered and on whether the answer came from the cache (stored without an OPT record),
 		// and a client that tracks cookie support per server address — c-ares does — discards the

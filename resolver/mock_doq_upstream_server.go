@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/quic-go/quic-go"

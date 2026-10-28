@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/0xERR0R/blocky/config"
+	"github.com/mia0x75/denyzer/config"
 	"github.com/quic-go/quic-go/http3"
 )
 

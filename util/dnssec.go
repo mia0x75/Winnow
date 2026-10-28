@@ -35,7 +35,7 @@ func isDNSSECAuthRecordType(rrType uint16) bool {
 // RFC 3225 §3 spells the exception out and extends it to QTYPE=ANY: "Security records that match
 // an explicit SIG, KEY, NXT, or ANY query, or are part of the zone data for an AXFR or IXFR query,
 // are included whether or not the DO bit was set." An ANY query therefore keeps everything. The
-// AXFR/IXFR half does not apply here: blocky forwards queries to an upstream resolver and never
+// AXFR/IXFR half does not apply here: denyzer forwards queries to an upstream resolver and never
 // serves zone transfers.
 func StripDNSSECRecords(msg *dns.Msg, requestedTypes ...uint16) bool {
 	if msg == nil || slices.Contains(requestedTypes, dns.TypeANY) {

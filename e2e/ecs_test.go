@@ -4,8 +4,8 @@ import (
 	"context"
 	"net"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,9 +37,9 @@ func addECSOption(msg *dns.Msg, ip net.IP) {
 
 var _ = Describe("EDNS Client Subnet (ECS)", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -54,7 +54,7 @@ var _ = Describe("EDNS Client Subnet (ECS)", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -70,7 +70,7 @@ var _ = Describe("EDNS Client Subnet (ECS)", func() {
 				msg := util.NewMsgWithQuestion("example.com.", A)
 				addECSOption(msg, net.ParseIP("10.0.0.1"))
 
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("example.com.", A, "1.2.3.4"),
@@ -88,7 +88,7 @@ var _ = Describe("EDNS Client Subnet (ECS)", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -104,7 +104,7 @@ var _ = Describe("EDNS Client Subnet (ECS)", func() {
 				msg := util.NewMsgWithQuestion("example.com.", A)
 				addECSOption(msg, net.ParseIP("10.1.2.3"))
 
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("example.com.", A, "1.2.3.4"),
@@ -122,7 +122,7 @@ var _ = Describe("EDNS Client Subnet (ECS)", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -139,7 +139,7 @@ var _ = Describe("EDNS Client Subnet (ECS)", func() {
 				msg := util.NewMsgWithQuestion("example.com.", A)
 				addECSOption(msg, net.ParseIP("10.1.2.3"))
 
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("example.com.", A, "1.2.3.4"),

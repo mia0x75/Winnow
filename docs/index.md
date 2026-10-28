@@ -1,14 +1,14 @@
-# Blocky
+# Denyzer
 
 <figure>
-  <img src="https://raw.githubusercontent.com/0xERR0R/blocky/main/docs/blocky.svg" width="200" />
+  <img src="https://raw.githubusercontent.com/mia0x75/denyzer/main/docs/denyzer.svg" width="200" />
 </figure>
 
-Blocky is a DNS proxy and ad-blocker for the local network written in Go with following features:
+Denyzer is a DNS proxy and ad-blocker for the local network written in Go with following features:
 
 ```mermaid
 flowchart LR
-    C[Client devices] -->|DNS query| B(Blocky)
+    C[Client devices] -->|DNS query| B(Denyzer)
     B -->|allowed query| U[Upstream resolvers]
     U -->|answer| B
     B -->|blocked domain| X[Blocked response]
@@ -34,7 +34,6 @@ flowchart LR
 
     * Customizable caching of DNS answers for queries -> improves DNS resolution speed and reduces amount of external DNS
       queries
-    * Prefetching and caching of often used queries
     * Using multiple external resolver simultaneously
     * Low memory footprint
 
@@ -55,14 +54,13 @@ flowchart LR
     * Uses random upstream resolvers from the configuration - increases your privacy through the distribution of your DNS
       traffic over multiple provider
     * Open source development
-    * Blocky does **NOT** collect any user data, telemetry, statistics etc.
+    * Denyzer does **NOT** collect any user data, telemetry, statistics etc.
 
 - **Integration** - :notebook_with_decorative_cover: various integration
 
-    * [Prometheus](https://prometheus.io/) metrics
-    * Prepared [Grafana](https://grafana.com/) dashboards (Prometheus and database)
-    * Logging of DNS queries per day / per client in CSV format or MySQL/MariaDB/PostgreSQL/Timescale database - easy to
-      analyze
+    * Embedded web dashboard (DenyzerUI) served at `/dashboard/`
+    * Query logging to an embedded SQLite store (per-day / per-client) with configurable retention - no external database
+      required
     * Various REST API endpoints
     * CLI tool
 
@@ -71,29 +69,15 @@ flowchart LR
     * Simple to maintain
     * Simple to backup
 
-- **Simple installation/configuration** - :cloud: blocky was designed for simple installation
+- **Simple installation/configuration** - :cloud: denyzer was designed for simple installation
 
-    * Stateless (no database, no temporary files)
+    * Single binary and embedded dashboard - no external services needed
     * Docker image with Multi-arch support
-    * Single binary
     * Supports x86-64, ARM, and MIPS architectures -> runs fine on Raspberry PI and OpenWrt routers
     * Community supported Helm chart for k8s deployment
 
 
 ## Contribution
 
-Issues, feature suggestions and pull requests are welcome! Blocky lives on :material-github:[GitHub](https://github.com/0xERR0R/blocky).
+Issues, feature suggestions and pull requests are welcome! Denyzer lives on :material-github:[GitHub](https://github.com/mia0x75/denyzer).
 
-## Support Blocky :heart:
-
-Blocky is **free, open source, and developed in my spare time** — with no telemetry, no data
-collection, and no hidden filtering. **Thousands of people run Blocky; only a handful support it.**
-If Blocky is useful to you, please consider chipping in — your support directly funds ongoing
-development and helps keep Blocky independent and ad-free, forever. Every contribution, however
-small, is hugely appreciated. Thank you! :heart:
-
-[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/0xERR0R)
-[![Support on thanks.dev](https://img.shields.io/badge/thanks.dev-support-00A98F)](https://thanks.dev/u/gh/0xERR0R)
-[![Donate on Liberapay](https://img.shields.io/badge/Liberapay-donate-F6C915?logo=liberapay&logoColor=black)](https://liberapay.com/spx01)
-[![Buy me a coffee on Ko-fi](https://img.shields.io/badge/Ko--fi-donate-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/0xerr0r)
-[![Donate via PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/spx01)

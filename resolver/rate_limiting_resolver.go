@@ -6,13 +6,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/metrics"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
@@ -36,10 +34,6 @@ type RateLimitingResolver struct {
 	store  *bucketStore
 	clock  func() time.Time
 	logger *logrus.Entry
-
-	drops         *prometheus.CounterVec
-	capExhausted  prometheus.Counter
-	activeBuckets prometheus.GaugeFunc
 }
 
 func NewRateLimitingResolver(ctx context.Context, cfg config.RateLimit) *RateLimitingResolver {
@@ -54,30 +48,6 @@ func NewRateLimitingResolver(ctx context.Context, cfg config.RateLimit) *RateLim
 	}
 	r.store = newBucketStore(rate.Limit(cfg.Rate), int(cfg.Burst), rateLimitBucketCap)
 	r.store.startJanitor(ctx, rateLimitJanitorInterval)
-
-	r.drops = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "blocky_rate_limit_drops_total",
-			Help: "Total number of DNS queries dropped by the rate limiter, by protocol.",
-		},
-		[]string{logFieldProtocol},
-	)
-	r.capExhausted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "blocky_rate_limit_cap_exhausted_total",
-			Help: "Total number of queries dropped because the in-memory bucket store was full.",
-		},
-	)
-	r.activeBuckets = prometheus.NewGaugeFunc(
-		prometheus.GaugeOpts{
-			Name: "blocky_rate_limit_active_buckets",
-			Help: "Number of token buckets currently held in memory.",
-		},
-		func() float64 { return float64(r.store.size.Load()) },
-	)
-	metrics.RegisterMetric(r.drops)
-	metrics.RegisterMetric(r.capExhausted)
-	metrics.RegisterMetric(r.activeBuckets)
 
 	return r
 }
@@ -95,9 +65,7 @@ func (r *RateLimitingResolver) Resolve(ctx context.Context, req *model.Request) 
 	if allowed {
 		return r.next.Resolve(ctx, req)
 	}
-	if entry == nil {
-		r.capExhausted.Inc()
-	}
+	// entry is nil when the bucket store is full; the query is still dropped.
 	r.recordDrop(req, entry)
 
 	return nil, ErrRateLimited
@@ -114,7 +82,6 @@ func (r *RateLimitingResolver) isAllowlisted(ip net.IP) bool {
 }
 
 func (r *RateLimitingResolver) recordDrop(req *model.Request, e *bucketEntry) {
-	r.drops.WithLabelValues(req.Protocol.String()).Inc()
 	if e == nil {
 		return
 	}

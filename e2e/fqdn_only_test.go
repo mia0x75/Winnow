@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("FQDN only mode", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -30,7 +30,7 @@ var _ = Describe("FQDN only mode", func() {
 
 	When("fqdnOnly is enabled", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -47,7 +47,7 @@ var _ = Describe("FQDN only mode", func() {
 			// the rejection must be a reply the client accepts: one that echoes the request id
 			// and question. A bare Rcode-only message is discarded as an id mismatch, leaving
 			// the client to time out instead of seeing the NXDOMAIN.
-			resp, err := doDNSRequest(ctx, blocky, msg)
+			resp, err := doDNSRequest(ctx, denyzer, msg)
 			Expect(err).Should(Succeed())
 			Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 			Expect(resp.Question).Should(Equal(msg.Question))
@@ -56,7 +56,7 @@ var _ = Describe("FQDN only mode", func() {
 
 		It("should resolve FQDN queries normally", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("example.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(
 					SatisfyAll(
 						BeDNSRecord("example.com.", A, "1.2.3.4"),
@@ -67,7 +67,7 @@ var _ = Describe("FQDN only mode", func() {
 
 	When("fqdnOnly is disabled (default)", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -78,7 +78,7 @@ var _ = Describe("FQDN only mode", func() {
 
 		It("should resolve non-FQDN queries normally", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("myserver.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(
 					SatisfyAll(
 						BeDNSRecord("myserver.", A, "5.6.7.8"),

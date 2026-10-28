@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/stats"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/stats"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 )
 

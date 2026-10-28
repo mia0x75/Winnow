@@ -15,14 +15,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/docs"
-	. "github.com/0xERR0R/blocky/helpertest"
-	. "github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/resolver"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/creasty/defaults"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/docs"
+	. "github.com/mia0x75/denyzer/helpertest"
+	. "github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/resolver"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -161,10 +161,6 @@ var _ = BeforeSuite(func() {
 		},
 		CertFile: certPem.Path,
 		KeyFile:  keyPem.Path,
-		Prometheus: config.Metrics{
-			Enable: true,
-			Path:   "/metrics",
-		},
 	}
 
 	// create server
@@ -356,31 +352,27 @@ var _ = Describe("Running DNS server", func() {
 		})
 		Context("health check", func() {
 			It("Should always return dummy response", func() {
-				resp := requestServer(ctx, util.NewMsgWithQuestion("healthcheck.blocky.", A))
+				resp := requestServer(ctx, util.NewMsgWithQuestion("healthcheck.denyzer.", A))
 
 				Expect(resp.Answer).Should(BeEmpty())
 			})
 		})
 	})
 
-	Describe("Prometheus endpoint", func() {
-		When("Prometheus URL is called", func() {
-			It("should return prometheus data", func() {
-				resp, err := http.Get(baseURL + "metrics")
-				Expect(err).Should(Succeed())
-				Expect(resp).Should(HaveHTTPStatus(http.StatusOK))
-			})
-		})
-	})
 	Describe("Root endpoint", func() {
 		When("Root URL is called", func() {
-			It("should return root page", func() {
-				resp, err := http.Get(baseURL)
+			It("should redirect to the dashboard", func() {
+				client := &http.Client{
+					CheckRedirect: func(req *http.Request, via []*http.Request) error {
+						return http.ErrUseLastResponse
+					},
+				}
+				resp, err := client.Get(baseURL)
 				Expect(err).Should(Succeed())
 				Expect(resp).Should(
 					SatisfyAll(
-						HaveHTTPStatus(http.StatusOK),
-						HaveHTTPHeaderWithValue("Content-type", "text/html; charset=UTF-8"),
+						HaveHTTPStatus(http.StatusMovedPermanently),
+						HaveHTTPHeaderWithValue("Location", "/dashboard/"),
 					))
 			})
 		})
@@ -785,21 +777,12 @@ var _ = Describe("Running DNS server", func() {
 			cfg.Upstreams.Groups = map[string][]config.Upstream{
 				"default": {config.Upstream{Net: config.NetProtocolTcpUdp, Host: "1.1.1.1", Port: 53}},
 			}
-
-			cfg.Redis.Address = "test-fail"
 		})
 		When("Server is created", func() {
-			It("is created without redis connection", func() {
+			It("is created successfully", func() {
 				_, err = NewServer(ctx, &cfg)
 
 				Expect(err).Should(Succeed())
-			})
-			It("can't be created if redis server is unavailable", func() {
-				cfg.Redis.Required = true
-
-				_, err = NewServer(ctx, &cfg)
-
-				Expect(err).Should(HaveOccurred())
 			})
 		})
 
@@ -1305,7 +1288,7 @@ var _ = Describe("Running DNS server", func() {
 			})
 		})
 
-		When("the response carries an OPT record blocky added itself", func() {
+		When("the response carries an OPT record denyzer added itself", func() {
 			// util.SetEdns0Option, which the EDE resolver uses on cache hits and blocked answers,
 			// leaves the class field zero. RFC 6891 section 6.2.4 makes a peer read that as 512.
 			It("advertises a usable buffer size instead of zero", func() {
@@ -1330,7 +1313,7 @@ var _ = Describe("Running DNS server", func() {
 		})
 
 		When("the client sent a DNS Cookie", func() {
-			// Blocky doesn't implement DNS Cookies (RFC 7873): it can neither produce a Server
+			// Denyzer doesn't implement DNS Cookies (RFC 7873): it can neither produce a Server
 			// Cookie of its own nor validate one a client returns. An upstream's cookie must
 			// therefore not reach the client, and the client's cookie must not reach an upstream.
 			const (
@@ -1619,7 +1602,7 @@ var _ = Describe("Running DNS server", func() {
 		})
 
 		When("the response fits the client buffer uncompressed but exceeds 512 bytes", func() {
-			// A forwarder in front of blocky advertises its own (large) EDNS0 buffer, so the
+			// A forwarder in front of denyzer advertises its own (large) EDNS0 buffer, so the
 			// buffer we truncate against is not the one the real client behind it uses. Sending
 			// such an answer uncompressed makes the forwarder truncate it for its 512-byte
 			// clients, which costs them the whole answer section.
@@ -1674,7 +1657,7 @@ var _ = Describe("Running DNS server", func() {
 			Expect(rr.Header().Get("Strict-Transport-Security")).Should(Equal("max-age=63072000"))
 			Expect(rr.Header().Get("X-Frame-Options")).Should(Equal("DENY"))
 			Expect(rr.Header().Get("X-Content-Type-Options")).Should(Equal("nosniff"))
-			Expect(rr.Header().Get("x-xss-protection")).Should(Equal("1; mode=block"))
+			Expect(rr.Header().Get("X-XSS-Protection")).Should(Equal("1; mode=block"))
 		})
 
 		It("should not set security headers for non-TLS requests", func() {

@@ -14,9 +14,9 @@ import (
 
 var _ = Describe("DoH3 functionality", Label("e2e"), func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -26,7 +26,7 @@ var _ = Describe("DoH3 functionality", Label("e2e"), func() {
 			`A google/NOERROR("A 1.2.3.4 123")`)
 		Expect(err).Should(Succeed())
 
-		blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+		denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 			upstreams:
 			  groups:
 			    default:
@@ -40,7 +40,7 @@ var _ = Describe("DoH3 functionality", Label("e2e"), func() {
 	})
 
 	It("serves DoH over HTTP/3", func(ctx context.Context) {
-		host, port, err := getContainerHostPort(ctx, blocky, "4000/udp")
+		host, port, err := getContainerHostPort(ctx, denyzer, "4000/udp")
 		Expect(err).Should(Succeed())
 
 		h3rt := &http3.Transport{
@@ -71,7 +71,7 @@ var _ = Describe("DoH3 functionality", Label("e2e"), func() {
 		// port that testcontainers picks. We only assert the h3=
 		// token is present; rewriting the port for external clients
 		// is out of scope for this test.
-		host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+		host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 		Expect(err).Should(Succeed())
 
 		tr := &http.Transport{

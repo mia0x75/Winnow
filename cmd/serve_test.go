@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/0xERR0R/blocky/helpertest"
+	"github.com/mia0x75/denyzer/helpertest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

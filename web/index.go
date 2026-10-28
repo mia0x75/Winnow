@@ -14,6 +14,9 @@ var IndexTmpl string
 //go:embed all:static
 var static embed.FS
 
+//go:embed all:dashboard
+var Dashboard embed.FS
+
 //go:embed robots.txt
 var WebFs embed.FS
 
@@ -21,6 +24,15 @@ func Assets() (fs.FS, error) {
 	subFS, err := fs.Sub(static, "static")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get static assets sub-filesystem: %w", err)
+	}
+
+	return subFS, nil
+}
+
+func DashboardFS() (fs.FS, error) {
+	subFS, err := fs.Sub(Dashboard, "dashboard")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dashboard sub-filesystem: %w", err)
 	}
 
 	return subFS, nil

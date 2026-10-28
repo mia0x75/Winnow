@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -14,9 +14,9 @@ import (
 
 var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -38,8 +38,8 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					)
 					Expect(err).Should(Succeed())
 
-					// Create blocky with DNSSEC validation enabled
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					// Create denyzer with DNSSEC validation enabled
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -56,7 +56,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					msg := util.NewMsgWithQuestion("invalid.dnssec.example.", A)
 					msg.SetEdns0(4096, true) // Enable DNSSEC OK (DO) bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should return SERVFAIL because DNSSEC validation failed
@@ -97,10 +97,10 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					)
 					Expect(err).Should(Succeed())
 
-					// Create blocky with DNSSEC validation enabled
+					// Create denyzer with DNSSEC validation enabled
 					// Add the generated DNSKEY as a trust anchor for the example. TLD
 					// This makes example. a trusted zone, similar to how root trust anchors work
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -119,7 +119,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					msg := util.NewMsgWithQuestion("www.example.", A)
 					msg.SetEdns0(4096, true) // Enable DNSSEC OK (DO) bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should return NOERROR because DNSSEC validation succeeded
@@ -137,12 +137,12 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 				})
 
 				It("should not return the DNSSEC records to a client with the DO bit clear", func(ctx context.Context) {
-					// Blocky queries the upstream with DO set so it can validate, but the records it
+					// Denyzer queries the upstream with DO set so it can validate, but the records it
 					// gets back are for validation, not for the client (RFC 4035 §3.2.1).
 					msg := util.NewMsgWithQuestion("www.example.", A)
 					msg.SetEdns0(4096, false) // EDNS0 present, DNSSEC OK (DO) bit clear
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess),
@@ -167,7 +167,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						withoutDO := util.NewMsgWithQuestion("www.example.", A)
 						withoutDO.SetEdns0(4096, false)
 
-						resp, err := doDNSRequest(ctx, blocky, withoutDO)
+						resp, err := doDNSRequest(ctx, denyzer, withoutDO)
 						Expect(err).Should(Succeed())
 						Expect(resp.Answer).ShouldNot(ContainElement(BeAssignableToTypeOf(&dns.RRSIG{})))
 
@@ -177,7 +177,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						withDO := util.NewMsgWithQuestion("www.example.", A)
 						withDO.SetEdns0(4096, true)
 
-						resp, err = doDNSRequest(ctx, blocky, withDO)
+						resp, err = doDNSRequest(ctx, denyzer, withDO)
 						Expect(err).Should(Succeed())
 						Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 						Expect(resp.Answer).Should(ContainElement(BeAssignableToTypeOf(&dns.RRSIG{})),
@@ -208,10 +208,10 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					)
 					Expect(err).Should(Succeed())
 
-					// Create blocky with DNSSEC validation enabled
+					// Create denyzer with DNSSEC validation enabled
 					// Add the wrong key as trust anchor so chain validation passes,
 					// but signature verification will fail
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet,
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet,
 						dedent(`
 						upstreams:
 						  groups:
@@ -231,7 +231,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					msg := util.NewMsgWithQuestion("www.mismatch.", A)
 					msg.SetEdns0(4096, true) // Enable DNSSEC OK (DO) bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should return SERVFAIL because RRSIG signature doesn't match DNSKEY
@@ -248,7 +248,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 				BeforeEach(func(ctx context.Context) {
 					// For now, use a real DNSSEC-validating upstream (Cloudflare)
 					// In the future, we could mock a proper DNSSEC-signed response
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -265,15 +265,15 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					msg := util.NewMsgWithQuestion("cloudflare.com.", A)
 					msg.SetEdns0(4096, true) // Enable DNSSEC OK (DO) bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should return NOERROR
 					Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 
 					// Should have the Authenticated Data (AD) flag set
-					// NOTE: Currently Blocky just passes through the AD flag from upstream
-					// After implementing validation, Blocky should set this flag itself
+					// NOTE: Currently Denyzer just passes through the AD flag from upstream
+					// After implementing validation, Denyzer should set this flag itself
 					Expect(resp.AuthenticatedData).Should(BeTrue(),
 						"AD flag should be set after successful DNSSEC validation")
 
@@ -316,13 +316,13 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					)
 					Expect(err).Should(Succeed())
 
-					// Create blocky with parent DNSKEY as trust anchor
+					// Create denyzer with parent DNSKEY as trust anchor
 					// The validator should:
 					// 1. Verify A record signature against child DNSKEY
 					// 2. Verify child DNSKEY against DS record
 					// 3. Verify DS record signature against parent DNSKEY
 					// 4. Verify parent DNSKEY against trust anchor
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet,
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet,
 						dedent(`
 						upstreams:
 						  groups:
@@ -342,7 +342,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					msg := util.NewMsgWithQuestion("www.child.parent.", A)
 					msg.SetEdns0(4096, true) // Enable DNSSEC OK (DO) bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should return NOERROR because full DNSSEC chain validated successfully
@@ -365,7 +365,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 
 				BeforeEach(func(ctx context.Context) {
 					// example. is a DNSSEC-signed zone; its KSK is installed as a trust
-					// anchor so blocky knows the zone is signed. An unsigned answer below
+					// anchor so denyzer knows the zone is signed. An unsigned answer below
 					// it must therefore be treated as bogus, not insecure.
 					var genErr error
 					signed, genErr = GenerateValidDNSSEC("example.", "www.example.", "192.0.2.10")
@@ -376,7 +376,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						`A www.example/NOERROR("A 203.0.113.77 300")`)
 					Expect(err).Should(Succeed())
 
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -395,7 +395,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					msg := util.NewMsgWithQuestion("www.example.", A)
 					msg.SetEdns0(4096, true) // DO bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					Expect(resp.Rcode).Should(Equal(dns.RcodeServerFailure),
@@ -421,7 +421,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						`A www.example/NOERROR("A 203.0.113.77 300")`)
 					Expect(err).Should(Succeed())
 
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -444,13 +444,13 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						msg.SetEdns0(4096, true) // DO bit
 
 						// First query populates the cache.
-						_, err := doDNSRequest(ctx, blocky, msg)
+						_, err := doDNSRequest(ctx, denyzer, msg)
 						Expect(err).Should(Succeed())
 
 						// The upstream disappears; any later answer comes from the cache.
 						Expect(mokka.Terminate(ctx)).Should(Succeed())
 
-						resp, err := doDNSRequest(ctx, blocky, msg)
+						resp, err := doDNSRequest(ctx, denyzer, msg)
 						Expect(err).Should(Succeed())
 
 						Expect(resp.Answer).ShouldNot(ContainElement(
@@ -474,7 +474,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						`A cloudflare.com/NOERROR("A 203.0.113.77 300")`)
 					Expect(err).Should(Succeed())
 
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -494,7 +494,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						msg := util.NewMsgWithQuestion("cloudflare.com.", A)
 						msg.SetEdns0(4096, true) // DO bit
 
-						resp, err := doDNSRequest(ctx, blocky, msg)
+						resp, err := doDNSRequest(ctx, denyzer, msg)
 						Expect(err).Should(Succeed())
 						Expect(resp.Rcode).Should(Equal(dns.RcodeServerFailure),
 							"forged unsigned answer accepted under the default root anchor")
@@ -504,7 +504,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 						// The malicious upstream disappears; any later answer comes from the cache.
 						Expect(mokka.Terminate(ctx)).Should(Succeed())
 
-						resp, err = doDNSRequest(ctx, blocky, msg)
+						resp, err = doDNSRequest(ctx, denyzer, msg)
 						Expect(err).Should(Succeed())
 						Expect(resp.Answer).ShouldNot(ContainElement(
 							BeDNSRecord("cloudflare.com.", A, "203.0.113.77")),
@@ -520,7 +520,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					)
 					Expect(err).Should(Succeed())
 
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -533,7 +533,7 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 				It("should not validate DNSSEC and accept all responses", func(ctx context.Context) {
 					msg := util.NewMsgWithQuestion("any.domain.example.", A)
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should return NOERROR and the answer
@@ -552,8 +552,8 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 			When("upstream returns invalid DNSSEC data with CheckingDisabled flag", func() {
 				BeforeEach(func(ctx context.Context) {
 					// Use Google DNS - when queried with +cd flag, it returns data even for broken DNSSEC
-					// With DNSSEC validation enabled, Blocky should independently validate and reject
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					// With DNSSEC validation enabled, Denyzer should independently validate and reject
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -570,18 +570,18 @@ var _ = Describe("DNSSEC validation", Label("dnssec"), func() {
 					// Query dnssec-failed.org with CheckingDisabled flag
 					// This domain has intentionally broken DNSSEC signatures
 					// Google DNS will return data when queried with +cd flag (CheckingDisabled)
-					// But Blocky should independently validate and reject it
+					// But Denyzer should independently validate and reject it
 					msg := util.NewMsgWithQuestion("dnssec-failed.org.", A)
 					msg.CheckingDisabled = true // +cd flag
 					msg.SetEdns0(4096, true)    // DO bit
 
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
-					// FIXED BEHAVIOR: Blocky validates independently regardless of upstream behavior
+					// FIXED BEHAVIOR: Denyzer validates independently regardless of upstream behavior
 					// Should return SERVFAIL because DNSSEC validation failed
 					Expect(resp.Rcode).Should(Equal(dns.RcodeServerFailure),
-						"Blocky should validate independently and reject broken DNSSEC")
+						"Denyzer should validate independently and reject broken DNSSEC")
 
 					// Should NOT have the Authenticated Data (AD) flag set
 					Expect(resp.AuthenticatedData).Should(BeFalse(),

@@ -16,15 +16,15 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
 
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/util"
 )
 
 var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
-	When("blocky and the nginx stream proxy both use the PROXY protocol", Ordered, func() {
+	When("denyzer and the nginx stream proxy both use the PROXY protocol", Ordered, func() {
 		var (
-			e2eNet *testcontainers.DockerNetwork
-			blocky testcontainers.Container
-			nginx  testcontainers.Container
+			e2eNet  *testcontainers.DockerNetwork
+			denyzer testcontainers.Container
+			nginx   testcontainers.Container
 		)
 
 		BeforeAll(func(ctx context.Context) {
@@ -35,10 +35,10 @@ var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
 				`A dohquery/NOERROR("A 1.2.3.4 123")`)
 			Expect(err).Should(Succeed())
 
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, proxyProtocolBlockyConfig("tls, https"))
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, proxyProtocolDenyzerConfig("tls, https"))
 			Expect(err).Should(Succeed())
 
-			// nginx must start after blocky so it can resolve the 'blocky' alias.
+			// nginx must start after denyzer so it can resolve the 'denyzer' alias.
 			nginx, err = createNginxStreamProxyContainer(ctx, e2eNet, true)
 			Expect(err).Should(Succeed())
 		})
@@ -51,10 +51,10 @@ var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
 			nginxIP, err := getContainerNetworkIP(ctx, nginx, e2eNet.Name)
 			Expect(err).Should(Succeed())
 
-			clientIP := proxyProtocolClientIP(ctx, blocky, "dotquery")
+			clientIP := proxyProtocolClientIP(ctx, denyzer, "dotquery")
 			Expect(net.ParseIP(clientIP)).ShouldNot(BeNil())
 			Expect(clientIP).ShouldNot(Equal(nginxIP),
-				"blocky should log the real client IP from the PROXY header, not the proxy's address")
+				"denyzer should log the real client IP from the PROXY header, not the proxy's address")
 		})
 
 		It("uses the PROXY header source as the client IP for DoH", func(ctx context.Context) {
@@ -65,18 +65,18 @@ var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
 			nginxIP, err := getContainerNetworkIP(ctx, nginx, e2eNet.Name)
 			Expect(err).Should(Succeed())
 
-			clientIP := proxyProtocolClientIP(ctx, blocky, "dohquery")
+			clientIP := proxyProtocolClientIP(ctx, denyzer, "dohquery")
 			Expect(net.ParseIP(clientIP)).ShouldNot(BeNil())
 			Expect(clientIP).ShouldNot(Equal(nginxIP),
-				"blocky should log the real client IP from the PROXY header, not the proxy's address")
+				"denyzer should log the real client IP from the PROXY header, not the proxy's address")
 		})
 	})
 
 	When("the PROXY protocol is not enabled", Ordered, func() {
 		var (
-			e2eNet *testcontainers.DockerNetwork
-			blocky testcontainers.Container
-			nginx  testcontainers.Container
+			e2eNet  *testcontainers.DockerNetwork
+			denyzer testcontainers.Container
+			nginx   testcontainers.Container
 		)
 
 		BeforeAll(func(ctx context.Context) {
@@ -87,7 +87,7 @@ var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
 				`A dohquery/NOERROR("A 1.2.3.4 123")`)
 			Expect(err).Should(Succeed())
 
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, proxyProtocolBlockyConfig(""))
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, proxyProtocolDenyzerConfig(""))
 			Expect(err).Should(Succeed())
 
 			nginx, err = createNginxStreamProxyContainer(ctx, e2eNet, false)
@@ -102,9 +102,9 @@ var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
 			nginxIP, err := getContainerNetworkIP(ctx, nginx, e2eNet.Name)
 			Expect(err).Should(Succeed())
 
-			clientIP := proxyProtocolClientIP(ctx, blocky, "dotquery")
+			clientIP := proxyProtocolClientIP(ctx, denyzer, "dotquery")
 			Expect(clientIP).Should(Equal(nginxIP),
-				"without PROXY protocol blocky sees the connection coming from the proxy")
+				"without PROXY protocol denyzer sees the connection coming from the proxy")
 		})
 
 		It("records the proxy address as the client IP for DoH", func(ctx context.Context) {
@@ -115,18 +115,18 @@ var _ = Describe("PROXY protocol behind an nginx stream proxy", func() {
 			nginxIP, err := getContainerNetworkIP(ctx, nginx, e2eNet.Name)
 			Expect(err).Should(Succeed())
 
-			clientIP := proxyProtocolClientIP(ctx, blocky, "dohquery")
+			clientIP := proxyProtocolClientIP(ctx, denyzer, "dohquery")
 			Expect(clientIP).Should(Equal(nginxIP),
-				"without PROXY protocol blocky sees the connection coming from the proxy")
+				"without PROXY protocol denyzer sees the connection coming from the proxy")
 		})
 	})
 })
 
-// proxyProtocolBlockyConfig returns a blocky config listening for DNS (53), DoT (853) and
+// proxyProtocolDenyzerConfig returns a denyzer config listening for DNS (53), DoT (853) and
 // HTTPS/DoH (443). It requires the PROXY protocol on the given comma-separated listener families
 // (empty disables it) and logs resolved queries to the console, so the recorded client IP can be
 // asserted from the container logs.
-func proxyProtocolBlockyConfig(families string) string {
+func proxyProtocolDenyzerConfig(families string) string {
 	return fmt.Sprintf(`log:
   level: info
 ports:
@@ -145,7 +145,7 @@ upstreams:
 }
 
 // queryDoTViaProxy sends a DNS-over-TLS query for the given question through the nginx proxy's
-// mapped 853 port. The TLS handshake terminates at blocky (nginx is a plain TCP passthrough).
+// mapped 853 port. The TLS handshake terminates at denyzer (nginx is a plain TCP passthrough).
 func queryDoTViaProxy(ctx context.Context, nginx testcontainers.Container, question string) error {
 	host, port, err := getContainerHostPort(ctx, nginx, "853/tcp")
 	if err != nil {
@@ -206,13 +206,13 @@ func queryDoHViaProxy(ctx context.Context, nginx testcontainers.Container, quest
 
 var clientIPLogRe = regexp.MustCompile(`client_ip="?([0-9a-fA-F.:]+)`)
 
-// proxyProtocolClientIP polls the blocky container logs for the resolved-query log entry of the
+// proxyProtocolClientIP polls the denyzer container logs for the resolved-query log entry of the
 // given question name and returns the client_ip it recorded.
-func proxyProtocolClientIP(ctx context.Context, blocky testcontainers.Container, questionName string) string {
+func proxyProtocolClientIP(ctx context.Context, denyzer testcontainers.Container, questionName string) string {
 	var clientIP string
 
 	Eventually(func() string {
-		lines, err := getContainerLogs(ctx, blocky)
+		lines, err := getContainerLogs(ctx, denyzer)
 		if err != nil {
 			return ""
 		}

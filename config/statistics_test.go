@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

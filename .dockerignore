@@ -2,6 +2,10 @@ bin
 dist
 site
 node_modules
+ui/node_modules
+ui/.next
+ui/out
+web/dashboard
 .git
 .idea
 .github

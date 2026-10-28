@@ -4,9 +4,9 @@ import (
 	"context"
 	"net"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 )
 
@@ -17,7 +17,7 @@ import (
 // CACHED responses are inspected: answers from conditional upstreams, custom DNS, the
 // hosts file, special-use domain handling and blocking are recognized by response
 // type and pass through untouched. Sitting above the cache means cached answers —
-// including entries synced from redis — are re-inspected on every hit; the cache in
+// including entries — are re-inspected on every hit; the cache in
 // turn stores only upstream-derived answers (see isCacheableResponseType), so CACHED
 // implies upstream origin. Internal lookups (e.g. blocking's FQDN client identifiers)
 // enter the chain below this resolver and bypass it entirely.
@@ -65,7 +65,7 @@ func (r *RebindingProtectionResolver) Resolve(ctx context.Context, request *mode
 	}
 
 	// only answers originating from the general upstreams are inspected — directly
-	// (RESOLVED) or served from the cache (CACHED, incl. entries synced via redis;
+	// (RESOLVED) or served from the cache (CACHED;
 	// the cache stores only upstream-derived answers). Anything else (blocked,
 	// conditional, custom DNS, hosts file, SUDN, ...) is trusted local/internal
 	// data and passes through untouched — except DNS64-synthesized answers, which
@@ -96,8 +96,8 @@ func (r *RebindingProtectionResolver) Resolve(ctx context.Context, request *mode
 	logger.WithField(logFieldDomain, util.Obfuscate(domain)).
 		Debugf("dropped answer with non-public IP %s", util.Obfuscate(ip.String()))
 
-	// fixed reason: it becomes a Prometheus label via MetricsResolver, and the IP is
-	// attacker-chosen — embedding it would allow unbounded cardinality growth
+	// fixed reason: the IP is attacker-chosen — embedding it would allow
+	// unbounded cardinality growth
 	return model.NewResponseWithRcode(request, dns.RcodeSuccess, model.ResponseTypeREBIND,
 		"REBIND (rebinding protection)"), nil
 }

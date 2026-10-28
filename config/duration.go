@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/0xERR0R/blocky/log"
 	"github.com/hako/durafmt"
+	"github.com/mia0x75/denyzer/log"
 )
 
 // Duration is a wrapper for time.Duration to support yaml unmarshalling

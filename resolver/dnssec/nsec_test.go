@@ -3,7 +3,7 @@ package dnssec
 import (
 	"context"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -354,7 +354,7 @@ var _ = Describe("NSEC validation", func() {
 		})
 
 		It("should cover underscore-prefixed subdomains using canonical ordering (issue #1969)", func() {
-			// Exact scenario from https://github.com/0xERR0R/blocky/issues/1969
+			// Exact scenario from https://github.com/mia0x75/denyzer/issues/1969
 			// RFC 4034 §6.1 canonical order: mail... < _25._tcp.mail... < pop...
 			nsec := &dns.NSEC{
 				Hdr:        dns.RR_Header{Name: "mail.boegli-bestattungen.ch.", Rrtype: dns.TypeNSEC},

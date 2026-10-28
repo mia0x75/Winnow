@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/0xERR0R/blocky/cmd"
+	"github.com/mia0x75/denyzer/cmd"
 )
 
 func main() {

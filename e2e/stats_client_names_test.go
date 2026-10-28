@@ -4,9 +4,9 @@ import (
 	"context"
 	"net"
 
-	"github.com/0xERR0R/blocky/api"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/api"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
@@ -14,9 +14,9 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-// Regression test for https://github.com/0xERR0R/blocky/issues/2152
+// Regression test for https://github.com/mia0x75/denyzer/issues/2152
 //
-// Queries that blocky answers on its own above the client-name lookup (a filtered query type,
+// Queries that denyzer answers on its own above the client-name lookup (a filtered query type,
 // a non-FQDN name) must be attributed to the same client as every other query of that client.
 // Before the fix they carried no client name, so the statistics counted them under the raw
 // client IP and the same client appeared twice in the top-clients list: once by name, once by
@@ -28,9 +28,9 @@ import (
 // filtered and non-FQDN queries alike.
 var _ = Describe("Statistics client identity (issue #2152)", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -40,7 +40,7 @@ var _ = Describe("Statistics client identity (issue #2152)", func() {
 			`A example.com/NOERROR("A 1.2.3.4 300")`)
 		Expect(err).Should(Succeed())
 
-		blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+		denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 			log:
 			  level: warn
 			upstreams:
@@ -68,7 +68,7 @@ var _ = Describe("Statistics client identity (issue #2152)", func() {
 
 	It("counts filtered and non-FQDN queries under the client name, not the client IP",
 		func(ctx context.Context) {
-			host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+			host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 			Expect(err).Should(Succeed())
 			statsURL := "http://" + net.JoinHostPort(host, port) + "/api/stats"
 
@@ -76,10 +76,10 @@ var _ = Describe("Statistics client identity (issue #2152)", func() {
 				msg := util.NewMsgWithQuestion(question, qType)
 				addECSOption(msg, net.ParseIP("10.0.0.1"))
 
-				return doDNSRequest(ctx, blocky, msg)
+				return doDNSRequest(ctx, denyzer, msg)
 			}
 
-			By("sending a query blocky forwards upstream", func() {
+			By("sending a query denyzer forwards upstream", func() {
 				Expect(ecsQuery("example.com.", A)).Should(BeDNSRecord("example.com.", A, "1.2.3.4"))
 			})
 
@@ -91,9 +91,9 @@ var _ = Describe("Statistics client identity (issue #2152)", func() {
 			})
 
 			By("sending a query the fqdnOnly resolver answers", func() {
-				// blocky answers NOTFQDN with a message that carries neither the request id nor
+				// denyzer answers NOTFQDN with a message that carries neither the request id nor
 				// the question section, which the DNS client rejects as an id mismatch (the
-				// fqdnOnly e2e test tolerates the same error). The query still reaches blocky
+				// fqdnOnly e2e test tolerates the same error). The query still reaches denyzer
 				// and is counted, which is what this test is about.
 				resp, err := ecsQuery("myserver.", A)
 				if err == nil {

@@ -1,79 +1,241 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/0xERR0R/blocky/api"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 )
 
 const (
-	statsTimeFormat        = "2006-01-02 15:04"
-	emptyNote              = "(none)"
-	statsTypeColLabel      = "Type"
-	percentMultiplier      = 100
-	statsListsAllowlistCol = 3
+	statsTimeFormat    = "2006-01-02 15:04"
+	statsTypeColLabel  = "Type"
+	statsCountColLabel = "Count"
+	emptyNote          = "(none)"
+	percentMultiplier  = 100
+	statsDefaultDays   = 7
+	statsDefaultLimit  = 10
+
+	// statsColSecond/statsColThird are 1-based table column indexes used for
+	// right-alignment.
+	statsColSecond = 2
+	statsColThird  = 3
 )
 
-// NewStatsCommand creates new command instance
-func NewStatsCommand() *cobra.Command {
-	return &cobra.Command{
+// newStatsCommand creates new command instance
+func newStatsCommand() *cobra.Command {
+	c := &cobra.Command{
 		Use:               "stats",
 		Args:              cobra.NoArgs,
 		Short:             "shows DNS statistics",
+		Long:              "Shows a summary of DNS query statistics collected by the running denyzer instance.",
 		RunE:              stats,
 		PersistentPreRunE: initConfigPreRun,
 	}
+
+	c.Flags().IntP("days", "d", statsDefaultDays, "time window in days for top lists and query types")
+	c.Flags().IntP("limit", "l", statsDefaultLimit, "number of entries shown in the top lists")
+
+	return c
+}
+
+// statsSnapshot aggregates every value rendered by the stats command.
+type statsSnapshot struct {
+	summary   *statsSummary
+	topDomain []nameCount
+	topBlkDom []nameCount
+	topClient []clientCount
+	queryType []queryTypeCount
+	lists     *statsLists
+	days      int
+}
+
+type statsSummary struct {
+	TotalQueries      uint64  `json:"totalQueries"`
+	BlockedCount      uint64  `json:"blocked"`
+	BlockedPercentage float64 `json:"blockedPercentage"`
+	CachedCount       uint64  `json:"cached"`
+	ForwardedCount    uint64  `json:"forwarded"`
+	FilteredCount     uint64  `json:"filtered"`
+	LocalCount        uint64  `json:"local"`
+	ErrorCount        uint64  `json:"errors"`
+	OtherCount        uint64  `json:"other"`
+	DroppedCount      uint64  `json:"dropped"`
+	CacheHitRate      float64 `json:"cacheHitRate"`
+	AvgResponseMs     uint64  `json:"avgResponseMs"`
+	CacheEntries      uint64  `json:"cacheEntries"`
+}
+
+type nameCount struct {
+	Name  string `json:"name"`
+	Count uint32 `json:"count"`
+}
+
+type clientCount struct {
+	Name    string `json:"name"`
+	Count   uint32 `json:"count"`
+	Blocked uint32 `json:"blocked"`
+}
+
+type queryTypeCount struct {
+	Type       string  `json:"type"`
+	Count      uint64  `json:"count"`
+	Percentage float64 `json:"percentage"`
+}
+
+type statsLists struct {
+	DenylistGroups   int `json:"denylistGroups"`
+	ListedDomains    int `json:"listedDomains"`
+	AllowlistDomains int `json:"allowlistDomains"`
 }
 
 func stats(cmd *cobra.Command, _ []string) error {
-	client, err := newAPIClient()
+	days, err := cmd.Flags().GetInt("days")
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.GetStatsWithResponse(cmd.Context())
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return err
+	}
+
+	snapshot, err := fetchStats(cmd.Context(), days, limit)
+	if err != nil {
+		return err
+	}
+
+	renderStats(cmd.OutOrStdout(), snapshot)
+
+	return nil
+}
+
+// fetchStats reads every section of the snapshot from the denyzer HTTP API.
+func fetchStats(ctx context.Context, days, limit int) (*statsSnapshot, error) {
+	summary := new(statsSummary)
+	if err := getJSON(ctx, "/api/stats/summary", nil, summary); err != nil {
+		return nil, fmt.Errorf("can't read stats summary: %w", err)
+	}
+
+	window := url.Values{}
+	window.Set("days", strconv.Itoa(days))
+	window.Set("limit", strconv.Itoa(limit))
+
+	topDomains := []nameCount{}
+	if err := getJSON(ctx, "/api/stats/top_domains", window, &topDomains); err != nil {
+		return nil, fmt.Errorf("can't read top domains: %w", err)
+	}
+
+	blockedWindow := url.Values{}
+	blockedWindow.Set("days", strconv.Itoa(days))
+	blockedWindow.Set("limit", strconv.Itoa(limit))
+	blockedWindow.Set("blocked", "true")
+
+	topBlocked := []nameCount{}
+	if err := getJSON(ctx, "/api/stats/top_domains", blockedWindow, &topBlocked); err != nil {
+		return nil, fmt.Errorf("can't read top blocked domains: %w", err)
+	}
+
+	topClients := []clientCount{}
+	if err := getJSON(ctx, "/api/stats/top_clients", window, &topClients); err != nil {
+		return nil, fmt.Errorf("can't read top clients: %w", err)
+	}
+
+	queryTypes := []queryTypeCount{}
+
+	typesWindow := url.Values{}
+	typesWindow.Set("days", strconv.Itoa(days))
+
+	if err := getJSON(ctx, "/api/stats/query_types", typesWindow, &queryTypes); err != nil {
+		return nil, fmt.Errorf("can't read query types: %w", err)
+	}
+
+	// Lists are optional: the endpoint returns 503 when no blocklist provider is
+	// wired into the resolver chain, which should not fail the whole command.
+	lists := new(statsLists)
+
+	if err := getJSON(ctx, "/api/stats/lists", nil, lists); err != nil {
+		if errors.Is(err, errStatsUnavailable) {
+			lists = nil
+		} else {
+			return nil, fmt.Errorf("can't read list stats: %w", err)
+		}
+	}
+
+	return &statsSnapshot{
+		summary:   summary,
+		topDomain: topDomains,
+		topBlkDom: topBlocked,
+		topClient: topClients,
+		queryType: queryTypes,
+		lists:     lists,
+		days:      days,
+	}, nil
+}
+
+// errStatsUnavailable signals that an optional stats endpoint is disabled.
+var errStatsUnavailable = errors.New("statistics are disabled")
+
+// getJSON performs a GET request against the denyzer API and decodes the JSON
+// response into out. query may be nil when no parameters are needed.
+func getJSON(ctx context.Context, path string, query url.Values, out any) error {
+	reqURL := apiURL() + strings.TrimPrefix(path, "/api")
+	if len(query) > 0 {
+		reqURL += "?" + query.Encode()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return fmt.Errorf("can't create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("can't execute %w", err)
 	}
+	defer resp.Body.Close()
 
-	switch resp.StatusCode() {
-	case http.StatusOK:
-		if resp.JSON200 == nil {
-			return errors.New("unexpected empty stats response")
-		}
-
-		renderStats(cmd.OutOrStdout(), resp.JSON200)
-
-		return nil
-	case http.StatusServiceUnavailable:
-		return errors.New("statistics are disabled (enable 'statistics.enable' in config)")
-	default:
-		return fmt.Errorf("response NOK, %s %s", resp.Status(), string(resp.Body))
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return errStatsUnavailable
 	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+
+		return fmt.Errorf("response NOK, %s %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("can't decode response: %w", err)
+	}
+
+	return nil
 }
 
 // renderStats writes a human-readable dashboard of the stats snapshot to w.
-func renderStats(w io.Writer, s *api.ApiStats) {
-	fmt.Fprintf(w, "Window: %s .. %s (UTC)\n\n",
-		s.Start.UTC().Format(statsTimeFormat),
-		s.End.UTC().Format(statsTimeFormat))
+func renderStats(w io.Writer, s *statsSnapshot) {
+	end := time.Now().UTC()
+	start := end.AddDate(0, 0, -s.days)
 
-	renderSummary(w, s)
-	renderTopTable(w, "Top Domains", s.TopDomains)
-	renderTopTable(w, "Top Blocked", s.TopBlockedDomains)
-	renderTopTable(w, "Top Clients", s.TopClients)
-	renderBreakdown(w, "By Query Type", s.ByQueryType)
-	renderBreakdown(w, "By Response Code", s.ByResponseCode)
-	renderBreakdown(w, "By Response Type", s.ByResponseType)
+	fmt.Fprintf(w, "Window: %s .. %s (UTC) - top lists cover the last %d day(s)\n\n",
+		start.Format(statsTimeFormat), end.Format(statsTimeFormat), s.days)
+
+	renderSummary(w, s.summary)
+	renderTopTable(w, "Top Domains", s.topDomain)
+	renderTopTable(w, "Top Blocked", s.topBlkDom)
+	renderClientTable(w, "Top Clients", s.topClient)
+	renderQueryTypes(w, s.queryType)
 	renderFooter(w, s)
 }
 
@@ -92,28 +254,26 @@ func newStatsTable(w io.Writer, rightAlignCols ...int) table.Writer {
 	return t
 }
 
-func renderSummary(w io.Writer, s *api.ApiStats) {
-	sum := s.Summary
+func renderSummary(w io.Writer, s *statsSummary) {
+	fmt.Fprintf(w, "Summary (all time)\n")
 
-	fmt.Fprintf(w, "Summary\n")
-
-	t := newStatsTable(w, 2)
+	t := newStatsTable(w, statsColSecond)
 	t.AppendHeader(table.Row{"Metric", "Value"})
-	t.AppendRow(table.Row{"Queries", formatInt(sum.Queries)})
-	t.AppendRow(table.Row{"Cached", withPercent(sum.Cached, sum.Queries)})
-	t.AppendRow(table.Row{"Forwarded", formatInt(sum.Forwarded)})
-	t.AppendRow(table.Row{"Blocked", withPercent(sum.Blocked, sum.Queries)})
-	t.AppendRow(table.Row{"Filtered", withPercent(sum.Filtered, sum.Queries)})
-	t.AppendRow(table.Row{"Local", formatInt(sum.Local)})
-	t.AppendRow(table.Row{"Dropped", formatInt(sum.Dropped)})
-	t.AppendRow(table.Row{"Errors", formatInt(sum.Errors)})
-	t.AppendRow(table.Row{"Avg response", fmt.Sprintf("%d ms", sum.AvgResponseMs)})
-	t.AppendRow(table.Row{"Cache hit rate", fmt.Sprintf("%.1f%%", sum.CacheHitRate*percentMultiplier)})
+	t.AppendRow(table.Row{"Queries", formatCount(s.TotalQueries)})
+	t.AppendRow(table.Row{"Cached", withPercent(s.CachedCount, s.TotalQueries)})
+	t.AppendRow(table.Row{"Forwarded", formatCount(s.ForwardedCount)})
+	t.AppendRow(table.Row{"Blocked", withPercent(s.BlockedCount, s.TotalQueries)})
+	t.AppendRow(table.Row{"Filtered", withPercent(s.FilteredCount, s.TotalQueries)})
+	t.AppendRow(table.Row{"Local", formatCount(s.LocalCount)})
+	t.AppendRow(table.Row{"Dropped", formatCount(s.DroppedCount)})
+	t.AppendRow(table.Row{"Errors", formatCount(s.ErrorCount)})
+	t.AppendRow(table.Row{"Avg response", fmt.Sprintf("%d ms", s.AvgResponseMs)})
+	t.AppendRow(table.Row{"Cache hit rate", fmt.Sprintf("%.1f%%", s.CacheHitRate*percentMultiplier)})
 	t.Render()
 	fmt.Fprintln(w)
 }
 
-func renderTopTable(w io.Writer, title string, rows []api.ApiNameCount) {
+func renderTopTable(w io.Writer, title string, rows []nameCount) {
 	if len(rows) == 0 {
 		fmt.Fprintf(w, "%s: %s\n\n", title, emptyNote)
 
@@ -122,98 +282,92 @@ func renderTopTable(w io.Writer, title string, rows []api.ApiNameCount) {
 
 	fmt.Fprintf(w, "%s\n", title)
 
-	t := newStatsTable(w, 2)
-	t.AppendHeader(table.Row{"Name", "Count"})
+	t := newStatsTable(w, statsColSecond)
+	t.AppendHeader(table.Row{"Domain", statsCountColLabel})
 
 	for _, r := range rows {
-		t.AppendRow(table.Row{r.Name, formatInt(r.Count)})
+		t.AppendRow(table.Row{r.Name, formatCount(uint64(r.Count))})
 	}
 
 	t.Render()
 	fmt.Fprintln(w)
 }
 
-func renderBreakdown(w io.Writer, title string, counts map[string]int) {
-	if len(counts) == 0 {
+func renderClientTable(w io.Writer, title string, rows []clientCount) {
+	if len(rows) == 0 {
 		fmt.Fprintf(w, "%s: %s\n\n", title, emptyNote)
 
 		return
 	}
 
-	type kv struct {
-		name  string
-		count int
-	}
-
-	items := make([]kv, 0, len(counts))
-	for k, v := range counts {
-		items = append(items, kv{k, v})
-	}
-
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].count != items[j].count {
-			return items[i].count > items[j].count
-		}
-
-		return items[i].name < items[j].name
-	})
-
 	fmt.Fprintf(w, "%s\n", title)
 
-	t := newStatsTable(w, 2)
-	t.AppendHeader(table.Row{statsTypeColLabel, "Count"})
+	t := newStatsTable(w, statsColSecond, statsColThird)
+	t.AppendHeader(table.Row{"Client", statsCountColLabel, "Blocked"})
 
-	for _, it := range items {
-		t.AppendRow(table.Row{it.name, formatInt(it.count)})
+	for _, r := range rows {
+		t.AppendRow(table.Row{r.Name, formatCount(uint64(r.Count)), formatCount(uint64(r.Blocked))})
 	}
 
 	t.Render()
 	fmt.Fprintln(w)
 }
 
-func renderFooter(w io.Writer, s *api.ApiStats) {
-	fmt.Fprintf(w, "Cache: %s entries\n\n", formatInt(s.Cache.Entries))
+func renderQueryTypes(w io.Writer, rows []queryTypeCount) {
+	if len(rows) == 0 {
+		fmt.Fprintf(w, "By Query Type: %s\n\n", emptyNote)
 
-	groups := map[string]struct{}{}
-	for g := range s.Lists.Denylist {
-		groups[g] = struct{}{}
+		return
 	}
 
-	for g := range s.Lists.Allowlist {
-		groups[g] = struct{}{}
+	items := make([]queryTypeCount, len(rows))
+	copy(items, rows)
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count != items[j].Count {
+			return items[i].Count > items[j].Count
+		}
+
+		return items[i].Type < items[j].Type
+	})
+
+	fmt.Fprintf(w, "By Query Type\n")
+
+	t := newStatsTable(w, statsColSecond, statsColThird)
+	t.AppendHeader(table.Row{statsTypeColLabel, statsCountColLabel, "Share"})
+
+	for _, it := range items {
+		t.AppendRow(table.Row{it.Type, formatCount(it.Count), fmt.Sprintf("%.1f%%", it.Percentage)})
 	}
 
-	if len(groups) == 0 {
+	t.Render()
+	fmt.Fprintln(w)
+}
+
+func renderFooter(w io.Writer, s *statsSnapshot) {
+	fmt.Fprintf(w, "Cache: %s entries\n", formatCount(s.summary.CacheEntries))
+
+	if s.lists == nil {
 		fmt.Fprintf(w, "Lists: %s\n", emptyNote)
 
 		return
 	}
 
-	names := make([]string, 0, len(groups))
-	for g := range groups {
-		names = append(names, g)
-	}
-
-	sort.Strings(names)
-
 	fmt.Fprintf(w, "Lists\n")
 
-	t := newStatsTable(w, 2, statsListsAllowlistCol)
-	t.AppendHeader(table.Row{"Group", "Denylist", "Allowlist"})
-
-	for _, g := range names {
-		t.AppendRow(table.Row{g, formatInt(s.Lists.Denylist[g]), formatInt(s.Lists.Allowlist[g])})
-	}
-
+	t := newStatsTable(w, statsColSecond, statsColThird)
+	t.AppendHeader(table.Row{"Group Metrics", "Denylist", "Allowlist"})
+	t.AppendRow(table.Row{"Groups", formatInt(s.lists.DenylistGroups), "—"})
+	t.AppendRow(table.Row{"Domains", formatInt(s.lists.ListedDomains), formatInt(s.lists.AllowlistDomains)})
 	t.Render()
 	fmt.Fprintln(w)
 }
 
-func withPercent(part, total int) string {
-	return fmt.Sprintf("%s (%s)", formatInt(part), formatPercent(part, total))
+func withPercent(part, total uint64) string {
+	return fmt.Sprintf("%s (%s)", formatCount(part), formatPercent(part, total))
 }
 
-func formatPercent(part, total int) string {
+func formatPercent(part, total uint64) string {
 	if total == 0 {
 		return "0.0%"
 	}
@@ -221,14 +375,37 @@ func formatPercent(part, total int) string {
 	return fmt.Sprintf("%.1f%%", float64(part)/float64(total)*percentMultiplier)
 }
 
+// formatInt renders a signed integer with thousands separators.
 func formatInt(n int) string {
-	s := strconv.Itoa(n)
+	return formatInt64(int64(n))
+}
 
-	neg := strings.HasPrefix(s, "-")
+// formatCount renders a non-negative counter with thousands separators.
+func formatCount(n uint64) string {
+	digits := strconv.FormatUint(n, 10)
+
+	return groupDigits(digits)
+}
+
+func formatInt64(n int64) string {
+	digits := strconv.FormatInt(n, 10)
+
+	neg := strings.HasPrefix(digits, "-")
 	if neg {
-		s = s[1:]
+		digits = digits[1:]
 	}
 
+	grouped := groupDigits(digits)
+	if neg {
+		return "-" + grouped
+	}
+
+	return grouped
+}
+
+// groupDigits inserts a comma every three digits of s, which must contain only
+// decimal digits.
+func groupDigits(s string) string {
 	var b strings.Builder
 
 	for i := range len(s) {
@@ -237,10 +414,6 @@ func formatInt(n int) string {
 		}
 
 		b.WriteByte(s[i])
-	}
-
-	if neg {
-		return "-" + b.String()
 	}
 
 	return b.String()

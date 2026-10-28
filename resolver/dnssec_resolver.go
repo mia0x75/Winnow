@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/resolver/dnssec"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/resolver/dnssec"
 	"github.com/miekg/dns"
 )
 
@@ -106,7 +106,7 @@ func (r *DNSSECResolver) Resolve(ctx context.Context, request *model.Request) (*
 		// - the whole namespace sits under the default root trust anchor - and turn every such
 		// lookup into SERVFAIL (#2126). Mirror the rebinding resolver's response-type whitelist
 		// and skip validation for them, clearing AD since we have not authenticated them. The
-		// RType is assigned by blocky's own resolvers, never by the (attacker-controlled) upstream
+		// RType is assigned by denyzer's own resolvers, never by the (attacker-controlled) upstream
 		// answer, so a poisoned public answer cannot mislabel itself out of validation.
 		if response != nil && response.Res != nil &&
 			response.RType != model.ResponseTypeRESOLVED && response.RType != model.ResponseTypeCACHED {

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xERR0R/blocky/lists/parsers"
+	"github.com/mia0x75/denyzer/lists/parsers"
 )
 
 // Golden-master tests: they build the grouped cache from list files through the

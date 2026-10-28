@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,9 +15,9 @@ import (
 
 var _ = Describe("Hosts file resolver", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -51,7 +51,7 @@ var _ = Describe("Hosts file resolver", func() {
 				cfg, cfgErr := config.LoadConfig(confFile, true)
 				Expect(cfgErr).Should(Succeed())
 
-				req := buildBlockyContainerRequest(confFile)
+				req := buildDenyzerContainerRequest(confFile)
 				req.Files = append(req.Files, testcontainers.ContainerFile{
 					HostFilePath:      hostsFile,
 					ContainerFilePath: "/app/hosts.txt",
@@ -61,14 +61,14 @@ var _ = Describe("Hosts file resolver", func() {
 				ctx, cancel := context.WithTimeout(ctx, 2*startupTimeout)
 				defer cancel()
 
-				blocky, err = startContainerWithNetwork(ctx, req, "blocky", e2eNet)
+				denyzer, err = startContainerWithNetwork(ctx, req, "denyzer", e2eNet)
 				Expect(err).Should(Succeed())
-				Expect(checkBlockyReadiness(ctx, cfg, blocky)).Should(Succeed())
+				Expect(checkDenyzerReadiness(ctx, cfg, denyzer)).Should(Succeed())
 			})
 
 			It("should resolve domains from the hosts file", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("myhost.example.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("myhost.example.", A, "192.168.1.1"),
@@ -78,7 +78,7 @@ var _ = Describe("Hosts file resolver", func() {
 
 			It("should resolve multiple hosts from the file", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("server.example.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("server.example.", A, "10.0.0.1"),
@@ -96,7 +96,7 @@ var _ = Describe("Hosts file resolver", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -110,7 +110,7 @@ var _ = Describe("Hosts file resolver", func() {
 
 			It("should resolve domains from the HTTP-served hosts file", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("webserver.example.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("webserver.example.", A, "172.16.0.1"))
 			})
 		})
@@ -124,7 +124,7 @@ var _ = Describe("Hosts file resolver", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -139,7 +139,7 @@ var _ = Describe("Hosts file resolver", func() {
 
 			It("should use the configured TTL for hosts file responses", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("myhost.example.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("myhost.example.", A, "192.168.1.1"),
@@ -158,7 +158,7 @@ var _ = Describe("Hosts file resolver", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -173,7 +173,7 @@ var _ = Describe("Hosts file resolver", func() {
 
 			It("should not resolve loopback entries", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("loopback.example.", A)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 				Expect(resp.Answer).Should(BeEmpty())
@@ -181,7 +181,7 @@ var _ = Describe("Hosts file resolver", func() {
 
 			It("should resolve non-loopback entries normally", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("normal.example.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("normal.example.", A, "192.168.1.1"))
 			})
 		})
@@ -195,7 +195,7 @@ var _ = Describe("Hosts file resolver", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -209,7 +209,7 @@ var _ = Describe("Hosts file resolver", func() {
 
 			It("should resolve exact hosts file entries", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("myhost.example.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("myhost.example.", A, "192.168.1.1"))
 			})
 		})

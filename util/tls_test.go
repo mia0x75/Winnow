@@ -10,7 +10,7 @@ import (
 var _ = Describe("TLS Util", func() {
 	Describe("TLSGenerateSelfSignedCert", func() {
 		It("returns a good value", func() {
-			const domain = "whatever.test.blocky.invalid"
+			const domain = "whatever.test.denyzer.invalid"
 
 			cert, err := TLSGenerateSelfSignedCert([]string{domain})
 			Expect(err).Should(Succeed())
@@ -37,8 +37,8 @@ var _ = Describe("TLS Util", func() {
 				Expect(chain).Should(Equal([][]*x509.Certificate{{cert.Leaf}}))
 			})
 
-			By("mentioning Blocky", func() {
-				Expect(cert.Leaf.Subject.Organization).Should(Equal([]string{"Blocky"}))
+			By("mentioning Denyzer", func() {
+				Expect(cert.Leaf.Subject.Organization).Should(Equal([]string{"Denyzer"}))
 			})
 		})
 	})

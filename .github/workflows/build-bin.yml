@@ -61,6 +61,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
       - name: Download dependencies
         run: go mod download
 
@@ -68,8 +73,8 @@ jobs:
         id: get_vars
         run: |
           # Check if the repository is forked and add upstream for correct versioning
-          if [[ "${{ github.repository_owner }}" != "0xERR0R" ]]; then
-            git remote add upstream https://github.com/0xERR0R/blocky.git
+          if [[ "${{ github.repository_owner }}" != "mia0x75" ]]; then
+            git remote add upstream https://github.com/mia0x75/denyzer.git
             git fetch upstream
           fi
           echo "version=$(git describe --always --tags)" >> $GITHUB_OUTPUT
@@ -93,11 +98,11 @@ jobs:
 
       - name: Rename binary
         if: inputs.goos  == 'windows'
-        run: mv bin/blocky bin/blocky.exe
+        run: mv bin/denyzer bin/denyzer.exe
 
       - name: Store build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: blocky_${{ steps.get_vars.outputs.version }}_${{ inputs.goos }}_${{ steps.get_vars.outputs.arch }}
-          path: bin/blocky*
+          name: denyzer_${{ steps.get_vars.outputs.version }}_${{ inputs.goos }}_${{ steps.get_vars.outputs.arch }}
+          path: bin/denyzer*
           retention-days: 5

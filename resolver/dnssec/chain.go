@@ -42,9 +42,6 @@ func (v *Validator) getCachedValidation(ctx context.Context, domain string) (Val
 		return ValidationResultIndeterminate, false
 	}
 
-	// Record cache hit
-	v.cacheHitMetrics.Inc()
-
 	return *result, true
 }
 

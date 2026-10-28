@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -35,8 +35,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with DNS64 enabled
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with DNS64 enabled
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -55,7 +55,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 			It("should synthesize AAAA record from A record", func(ctx context.Context) {
 				By("querying for AAAA record", func() {
 					msg := util.NewMsgWithQuestion("ipv4only.example.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should get synthesized AAAA record
@@ -74,7 +74,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 
 				By("verifying TTL matches A record TTL", func() {
 					msg := util.NewMsgWithQuestion("ipv4only.example.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// TTL should be from A record (300 seconds)
@@ -95,8 +95,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with DNS64 enabled
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with DNS64 enabled
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -114,7 +114,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 			It("should return native AAAA record without synthesis", func(ctx context.Context) {
 				By("querying for AAAA record", func() {
 					msg := util.NewMsgWithQuestion("ipv6native.example.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should get native AAAA record, not synthesized
@@ -132,7 +132,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				By("verifying no A query was made (no synthesis)", func() {
 					// If we query again, it should still return the native AAAA
 					msg := util.NewMsgWithQuestion("ipv6native.example.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should still be native IPv6, proving no synthesis occurred
@@ -154,8 +154,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with DNS64 enabled
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with DNS64 enabled
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -172,7 +172,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 
 			It("should synthesize AAAA record and preserve CNAME chain", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("cname.example.com.", AAAA)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				// Should get CNAME record and synthesized AAAA record
@@ -201,8 +201,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with DNS64 enabled
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with DNS64 enabled
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -219,7 +219,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 
 			It("should use the minimum TTL from the CNAME chain for the synthesized record", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("short-ttl-cname.example.com.", AAAA)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				// Should get CNAME record and synthesized AAAA record
@@ -257,8 +257,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with DNS64 enabled
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with DNS64 enabled
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -275,7 +275,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 
 			It("should ignore the excluded record and synthesize from the A record", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("excluded.example.com.", AAAA)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				// Should get a single synthesized AAAA record, not the excluded one
@@ -299,8 +299,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with two DNS64 prefixes
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with two DNS64 prefixes
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -318,7 +318,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 
 			It("should synthesize an AAAA record for each prefix", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("ipv4only.example.com.", AAAA)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				// Should get two synthesized AAAA records
@@ -344,8 +344,8 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with DNS64 and caching enabled
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				// Create denyzer with DNS64 and caching enabled
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: debug
 					upstreams:
@@ -365,7 +365,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 			It("should work correctly with caching enabled", func(ctx context.Context) {
 				By("first query should synthesize AAAA record", func() {
 					msg := util.NewMsgWithQuestion("cached.example.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Verify the synthesized record
@@ -376,7 +376,7 @@ var _ = Describe("DNS64 e2e tests", Label("e2e"), func() {
 
 				By("second query should return same synthesized result", func() {
 					msg := util.NewMsgWithQuestion("cached.example.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Verify the synthesized record is still correct

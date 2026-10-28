@@ -13,7 +13,7 @@ jobs:
   sync:
     name: Sync with Upstream
     runs-on: ubuntu-latest
-    if: github.repository_owner != '0xERR0R'
+    if: github.repository_owner != 'mia0x75'
     steps:
       - name: Enabled Check
         id: check

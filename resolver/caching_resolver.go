@@ -9,18 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xERR0R/blocky/cache"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/metrics"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
-	expirationcache "github.com/0xERR0R/expiration-cache"
-
-	"github.com/0xERR0R/blocky/cache/prefetching"
+	"github.com/mia0x75/denyzer/cache"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,33 +25,12 @@ const (
 	cachedReason = "CACHED"
 )
 
-// CacheDecorator optionally wraps the result cache (e.g., with Redis sync).
-type CacheDecorator func(cache.ExpiringCache[[]byte]) (cache.ExpiringCache[[]byte], error)
-
-//nolint:gochecknoglobals
-var (
-	cacheHits = promauto.With(metrics.Reg).NewCounter(
-		prometheus.CounterOpts{
-			Name: "blocky_cache_hits_total",
-			Help: "Cache hit counter",
-		},
-	)
-	cacheMisses = promauto.With(metrics.Reg).NewCounter(
-		prometheus.CounterOpts{
-			Name: "blocky_cache_misses_total",
-			Help: "Cache miss counter",
-		},
-	)
-)
-
 // CachingResolver caches answers from dns queries with their TTL time,
 // to avoid external resolver calls for recurrent queries
 type CachingResolver struct {
 	configurable[*config.Caching]
 	NextResolver
 	typed
-
-	emitMetricEvents bool // disabled by Bootstrap
 
 	// prefetchDO makes prefetch reloads request DNSSEC records (DO bit) so a
 	// reload can't replace a signed entry with an unsigned one. Set from
@@ -70,99 +43,27 @@ type CachingResolver struct {
 }
 
 // NewCachingResolver creates a new resolver instance
-func NewCachingResolver(ctx context.Context,
-	cfg config.Caching,
-	dnssecCfg config.DNSSEC,
-	decorator CacheDecorator,
-) (*CachingResolver, error) {
-	return newCachingResolver(ctx, cfg, dnssecCfg, decorator, true)
+func NewCachingResolver(ctx context.Context, cfg config.Caching, dnssecCfg config.DNSSEC) (*CachingResolver, error) {
+	return newCachingResolver(ctx, cfg, dnssecCfg)
 }
 
 func newCachingResolver(ctx context.Context,
 	cfg config.Caching,
 	dnssecCfg config.DNSSEC,
-	decorator CacheDecorator,
-	emitMetricEvents bool,
 ) (*CachingResolver, error) {
 	c := &CachingResolver{
-		configurable:     withConfig(&cfg),
-		typed:            withType("caching"),
-		emitMetricEvents: emitMetricEvents,
-		prefetchDO:       dnssecCfg.Validate,
+		configurable: withConfig(&cfg),
+		typed:        withType("caching"),
+		prefetchDO:   dnssecCfg.Validate,
 	}
 
 	configureCaches(ctx, c, &cfg)
 	err := configureExclusions(c, &cfg)
 
-	if decorator != nil {
-		decorated, err := decorator(c.resultCache)
-		if err != nil {
-			return nil, fmt.Errorf("failed to apply cache decorator: %w", err)
-		}
-
-		c.resultCache = decorated
-	}
-
 	return c, err
 }
 
-func configureCaches(ctx context.Context, c *CachingResolver, cfg *config.Caching) {
-	options := expirationcache.Options{
-		CleanupInterval: defaultCachingCleanUpInterval,
-		MaxSize:         uint(cfg.MaxItemsCount),
-		Shards:          cache.ShardCount(),
-		OnCacheHitFn: func(key string) {
-			cacheHits.Inc()
-		},
-		OnCacheMissFn: func(key string) {
-			cacheMisses.Inc()
-		},
-		OnAfterPutFn: func(newSize int) {
-			c.publishMetricsIfEnabled(evt.CachingResultCacheChanged, newSize)
-		},
-	}
-
-	if cfg.Prefetching {
-		prefetchingOptions := prefetching.PrefetchingOptions[[]byte]{
-			Options:               options,
-			PrefetchExpires:       time.Duration(cfg.PrefetchExpires),
-			PrefetchThreshold:     cfg.PrefetchThreshold,
-			PrefetchMaxItemsCount: cfg.PrefetchMaxItemsCount,
-			ReloadFn:              c.reloadCacheEntry,
-			OnPrefetchAfterPut: func(newSize int) {
-				c.publishMetricsIfEnabled(evt.CachingDomainsToPrefetchCountChanged, newSize)
-			},
-			OnPrefetchEntryReloaded: func(key string) {
-				c.publishMetricsIfEnabled(evt.CachingDomainPrefetched, key)
-			},
-			OnPrefetchCacheHit: func(key string) {
-				c.publishMetricsIfEnabled(evt.CachingPrefetchCacheHit, key)
-			},
-		}
-
-		c.resultCache = prefetching.NewPrefetchingCache(ctx, prefetchingOptions)
-	} else {
-		c.resultCache = expirationcache.NewCache[[]byte](ctx, options)
-	}
-}
-
-func configureExclusions(c *CachingResolver, cfg *config.Caching) error {
-	compiled := []*regexp.Regexp{}
-	for _, expStr := range cfg.Exclude {
-		if !strings.HasPrefix(expStr, "/") || !strings.HasSuffix(expStr, "/") {
-			return fmt.Errorf("cache exclusion configuration '%s' fail because of missing slashes", expStr)
-		}
-		re, err := regexp.Compile(strings.TrimSpace(expStr[1 : len(expStr)-1]))
-		if err != nil {
-			return fmt.Errorf("cache exclusion configuration '%s' fail because '%s'", expStr, err.Error())
-		}
-		compiled = append(compiled, re)
-	}
-	c.compiledExclusions = compiled
-
-	return nil
-}
-
+// reloadCacheEntry reloads a prefetched entry by re-resolving it upstream.
 func (r *CachingResolver) reloadCacheEntry(ctx context.Context, cacheKey string) (*[]byte, time.Duration) {
 	qType, domainName := util.ExtractCacheKey(cacheKey)
 	ctx, logger := r.log(ctx)
@@ -193,8 +94,8 @@ func (r *CachingResolver) reloadCacheEntry(ctx context.Context, cacheKey string)
 		return nil, 0
 	}
 
-	// clamp the record TTLs before packing so the stored (and Redis-synced) bytes
-	// carry the same TTLs the normal put path produces.
+	// clamp the record TTLs before packing so the stored bytes carry the same
+	// TTLs the normal put path produces.
 	ttl := r.adjustTTLs(response.Res.Answer)
 
 	packed, err := packForCache(ctx, response.Res)
@@ -205,7 +106,52 @@ func (r *CachingResolver) reloadCacheEntry(ctx context.Context, cacheKey string)
 	return &packed, ttl
 }
 
-// LogConfig implements `config.Configurable`.
+func configureCaches(ctx context.Context, c *CachingResolver, cfg *config.Caching) {
+	options := cache.Options{
+		CleanupInterval: defaultCachingCleanUpInterval,
+		MaxSize:         uint(max(cfg.MaxItemsCount, 0)),
+		OnAfterPutFn: func(newSize int) {
+			evt.Bus().Publish(evt.CachingResultCacheChanged, newSize)
+		},
+	}
+
+	if !cfg.Prefetching {
+		c.resultCache = cache.NewCache[[]byte](options)
+
+		return
+	}
+
+	c.resultCache = cache.NewPrefetchingCache[[]byte](ctx, options, cache.PrefetchingOptions[[]byte]{
+		ReloadFn:          c.reloadCacheEntry,
+		PrefetchExpires:   time.Duration(cfg.PrefetchExpires),
+		PrefetchThreshold: cfg.PrefetchThreshold,
+		MaxItemsCount:     cfg.PrefetchMaxItemsCount,
+		OnPrefetchEntryReloaded: func(key string) {
+			evt.Bus().Publish(evt.CachingDomainPrefetched, key)
+		},
+		OnPrefetchCacheHit: func(key string) {
+			evt.Bus().Publish(evt.CachingPrefetchCacheHit, key)
+		},
+	})
+}
+
+func configureExclusions(c *CachingResolver, cfg *config.Caching) error {
+	compiled := []*regexp.Regexp{}
+	for _, expStr := range cfg.Exclude {
+		if !strings.HasPrefix(expStr, "/") || !strings.HasSuffix(expStr, "/") {
+			return fmt.Errorf("cache exclusion configuration '%s' fail because of missing slashes", expStr)
+		}
+		re, err := regexp.Compile(strings.TrimSpace(expStr[1 : len(expStr)-1]))
+		if err != nil {
+			return fmt.Errorf("cache exclusion configuration '%s' fail because '%s'", expStr, err.Error())
+		}
+		compiled = append(compiled, re)
+	}
+	c.compiledExclusions = compiled
+
+	return nil
+}
+
 func (r *CachingResolver) LogConfig(logger *logrus.Entry) {
 	r.cfg.LogConfig(logger)
 
@@ -356,8 +302,7 @@ func isResponseCacheable(msg *dns.Msg) bool {
 }
 
 // packForCache copies the message, strips EDNS0 OPT records (which must never be
-// cached) and returns the packed wire bytes. Both the normal put path and the
-// prefetch reload path use it so cached and prefetched entries are byte-identical.
+// cached) and returns the packed wire bytes.
 func packForCache(ctx context.Context, msg *dns.Msg) ([]byte, error) {
 	msgCopy := msg.Copy()
 	util.RemoveEdns0Record(msgCopy)
@@ -401,6 +346,11 @@ func (r *CachingResolver) putInCache(
 	}
 }
 
+// EntryCount returns the number of currently cached (valid, not expired) entries.
+func (r *CachingResolver) EntryCount() int {
+	return r.resultCache.TotalCount()
+}
+
 // adjustTTLs calculates and returns the min TTL (considers also the min and max cache time)
 // for all records from answer or a negative cache time for empty answer
 // adjust the TTL in the answer header accordingly
@@ -432,12 +382,6 @@ func (r *CachingResolver) adjustTTLs(answer []dns.RR) (ttl time.Duration) {
 	}
 
 	return time.Duration(minTTL) * time.Second
-}
-
-func (r *CachingResolver) publishMetricsIfEnabled(event string, val any) {
-	if r.emitMetricEvents {
-		evt.Bus().Publish(event, val)
-	}
 }
 
 func (r *CachingResolver) FlushCaches(ctx context.Context) {

@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,9 +19,9 @@ import (
 
 var _ = Describe("API endpoints", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -36,7 +36,7 @@ var _ = Describe("API endpoints", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -50,13 +50,13 @@ var _ = Describe("API endpoints", func() {
 			})
 
 			It("should clear cache via API", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				baseURL := "http://" + net.JoinHostPort(host, port)
 
 				By("populating cache with a query", func() {
 					msg := util.NewMsgWithQuestion("cached.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("cached.example.com.", A, "1.2.3.4"))
 				})
 
@@ -64,7 +64,7 @@ var _ = Describe("API endpoints", func() {
 					time.Sleep(2 * time.Second)
 
 					msg := util.NewMsgWithQuestion("cached.example.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Answer).Should(HaveLen(1))
 					Expect(resp.Answer[0].Header().Ttl).Should(BeNumerically("<", 300))
@@ -79,7 +79,7 @@ var _ = Describe("API endpoints", func() {
 
 				By("verifying cache was cleared (TTL reset to full value)", func() {
 					msg := util.NewMsgWithQuestion("cached.example.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Answer).Should(HaveLen(1))
 					Expect(resp.Answer[0].Header().Ttl).Should(BeNumerically(">=", 295))
@@ -96,7 +96,7 @@ var _ = Describe("API endpoints", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -108,7 +108,7 @@ var _ = Describe("API endpoints", func() {
 			})
 
 			It("should resolve queries via API", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				baseURL := "http://" + net.JoinHostPort(host, port)
 
@@ -160,7 +160,7 @@ var _ = Describe("API endpoints", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -179,13 +179,13 @@ var _ = Describe("API endpoints", func() {
 			})
 
 			It("should temporarily disable blocking for the specified duration", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				baseURL := "http://" + net.JoinHostPort(host, port)
 
 				By("verifying domain is blocked", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "0.0.0.0"))
 				})
 
@@ -198,14 +198,14 @@ var _ = Describe("API endpoints", func() {
 
 				By("verifying domain is unblocked", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "5.6.7.8"))
 				})
 
 				By("waiting for duration to expire and verifying blocking is re-enabled", func() {
 					Eventually(func() *dns.Msg {
 						msg := util.NewMsgWithQuestion("blocked.com.", A)
-						resp, _ := doDNSRequest(ctx, blocky, msg)
+						resp, _ := doDNSRequest(ctx, denyzer, msg)
 
 						return resp
 					}, "10s", "500ms").Should(BeDNSRecord("blocked.com.", A, "0.0.0.0"))
@@ -229,7 +229,7 @@ var _ = Describe("API endpoints", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver-malware", e2eNet, "malware-list.txt", "malware-domain.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -251,17 +251,17 @@ var _ = Describe("API endpoints", func() {
 			})
 
 			It("should disable only the specified group", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				baseURL := "http://" + net.JoinHostPort(host, port)
 
 				By("verifying both groups are blocking", func() {
 					msg := util.NewMsgWithQuestion("ads-domain.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("ads-domain.com.", A, "0.0.0.0"))
 
 					msg = util.NewMsgWithQuestion("malware-domain.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("malware-domain.com.", A, "0.0.0.0"))
 				})
 
@@ -274,13 +274,13 @@ var _ = Describe("API endpoints", func() {
 
 				By("verifying ads group is unblocked", func() {
 					msg := util.NewMsgWithQuestion("ads-domain.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("ads-domain.com.", A, "5.6.7.8"))
 				})
 
 				By("verifying malware group is still blocked", func() {
 					msg := util.NewMsgWithQuestion("malware-domain.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("malware-domain.com.", A, "0.0.0.0"))
 				})
 
@@ -291,7 +291,7 @@ var _ = Describe("API endpoints", func() {
 					Expect(resp.StatusCode).Should(Equal(http.StatusOK))
 
 					msg := util.NewMsgWithQuestion("ads-domain.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("ads-domain.com.", A, "0.0.0.0"))
 				})
 			})

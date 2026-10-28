@@ -1,33 +1,56 @@
 package config
 
 import (
-	"net/url"
-	"strings"
-
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	defaultHistoryMonths = 1
+	maxHistoryMonths     = 12
+)
+
+// QueryLogRetention controls normal history cleanup for the embedded SQLite
+// store. Cleanup removes query logs and short-lived metrics older than the
+// selected cutoff while preserving all-time counters and global daily metrics.
+type QueryLogRetention struct {
+	// Delete query logs and short-lived metrics older than N months (1-12).
+	// 0 → default 1.
+	HistoryMonths int `default:"1" yaml:"historyMonths"`
+}
+
 // QueryLog configuration for the query logging
 type QueryLog struct {
-	// Directory for CSV log files, file path for sqlite, or database URL for mysql/postgresql/timescale,
-	// or dnstap socket address (unix:/path, tcp://host:port, or bare /path for unix).
+	// Path of the SQLite database file, or a directory that stores it as
+	// denyzer.db.
 	Target Secret `yaml:"target"`
-	// Log target type: mysql, postgresql, timescale, sqlite, csv, csv-client, console, dnstap, or none.
+	// Log target type: sqlite (default when omitted), console, or none.
 	Type QueryLogType `yaml:"type"`
-	// Delete log entries older than this many days. 0 disables retention cleanup.
-	LogRetentionDays uint64 `yaml:"logRetentionDays"`
+	// Per-table TTL retention settings for the embedded store.
+	Retention QueryLogRetention `yaml:"retention"`
 	// Maximum number of attempts to create the query log writer on startup.
 	CreationAttempts int `default:"3" yaml:"creationAttempts"`
 	// Delay between query log writer creation attempts.
 	CreationCooldown Duration `default:"2s" yaml:"creationCooldown"`
 	// Which fields to include in log entries; defaults to all available fields.
 	Fields []QueryLogField `yaml:"fields"`
-	// Interval at which buffered log entries are flushed in bulk to the database or dnstap socket
-	// (used by the mysql, postgresql, timescale, sqlite and dnstap targets).
+	// Interval at which buffered log entries are flushed in bulk to the database.
 	FlushInterval Duration `default:"30s" yaml:"flushInterval"`
+	// Maximum number of entries accumulated before a flush is triggered.
+	BatchSize int `default:"100" yaml:"batchSize"`
 	// Rules to suppress certain queries from being logged.
 	Ignore QueryLogIgnore `yaml:"ignore"`
+}
+
+// EffectiveHistoryMonths returns the configured or default cleanup window,
+// clamped to the supported 1-12 month range.
+func (r QueryLogRetention) EffectiveHistoryMonths() int {
+	months := r.HistoryMonths
+	if months <= 0 {
+		months = defaultHistoryMonths
+	}
+
+	return min(months, maxHistoryMonths)
 }
 
 type QueryLogIgnore struct {
@@ -55,13 +78,14 @@ func (c *QueryLog) LogConfig(logger *logrus.Entry) {
 	logger.Infof("type: %s", c.Type)
 
 	if c.Target != "" {
-		logger.Infof("target: %s", c.censoredTarget())
+		logger.Infof("target: %s", c.Target.Reveal())
 	}
 
-	logger.Infof("logRetentionDays: %d", c.LogRetentionDays)
+	logger.Infof("retention: history=%dmo", c.Retention.EffectiveHistoryMonths())
 	logger.Debugf("creationAttempts: %d", c.CreationAttempts)
 	logger.Debugf("creationCooldown: %s", c.CreationCooldown)
 	logger.Infof("flushInterval: %s", c.FlushInterval)
+	logger.Infof("batchSize: %d", c.BatchSize)
 	logger.Infof("fields: %s", c.Fields)
 
 	logger.Infof("ignore:")
@@ -77,28 +101,4 @@ func (c *QueryLog) LogConfig(logger *logrus.Entry) {
 			})
 		}
 	})
-}
-
-func (c *QueryLog) censoredTarget() string {
-	target := c.Target.Reveal()
-
-	// Make sure there's a scheme, otherwise the user is parsed as the scheme
-	targetStr := target
-	if !strings.Contains(targetStr, "://") {
-		targetStr = c.Type.String() + "://" + targetStr
-	}
-
-	parsed, err := url.Parse(targetStr)
-	if err != nil {
-		// The target couldn't be parsed, so we can't locate and redact an embedded
-		// password. Redact the whole value rather than risk leaking a secret.
-		return secretObfuscator
-	}
-
-	pass, ok := parsed.User.Password()
-	if !ok {
-		return target
-	}
-
-	return strings.ReplaceAll(target, pass, secretObfuscator)
 }

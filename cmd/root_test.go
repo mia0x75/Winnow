@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	. "github.com/0xERR0R/blocky/helpertest"
+	. "github.com/mia0x75/denyzer/helpertest"
 )
 
 // Mock implementation of codeWithStatus interface for testing

@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/0xERR0R/blocky/config/schema"
+	"github.com/mia0x75/denyzer/config/schema"
 )
 
 var _ = Describe("ValidateYAML", func() {
@@ -49,15 +49,15 @@ var _ = Describe("ValidateYAML", func() {
 		Expect(errs[0].Path).Should(ContainSubstring("queryTypes"))
 	})
 
-	// Permissive-superset guards: blocky's TextUnmarshaler-backed scalar types
+	// Permissive-superset guards: denyzer's TextUnmarshaler-backed scalar types
 	// accept both a bare number and its quoted-string form; the schema must
-	// accept everything blocky accepts, otherwise a valid config is flagged.
+	// accept everything denyzer accepts, otherwise a valid config is flagged.
 	It("accepts both the integer and quoted-string forms of ECS masks", func() {
 		for _, form := range []string{"24", `"24"`} {
 			errs, err := schema.ValidateYAML([]byte("ecs:\n  ipv4Mask: " + form + "\n  ipv6Mask: " + form + "\n"))
 			Expect(err).Should(Succeed())
 			Expect(errs).Should(BeEmpty(),
-				"blocky accepts ECS mask form %s via UnmarshalText; the schema must too", form)
+				"denyzer accepts ECS mask form %s via UnmarshalText; the schema must too", form)
 		}
 	})
 
@@ -66,7 +66,7 @@ var _ = Describe("ValidateYAML", func() {
 			errs, err := schema.ValidateYAML([]byte("customDNS:\n  customTTL: " + form + "\n"))
 			Expect(err).Should(Succeed())
 			Expect(errs).Should(BeEmpty(),
-				"blocky accepts duration form %s (bare number = deprecated minutes); the schema must too", form)
+				"denyzer accepts duration form %s (bare number = deprecated minutes); the schema must too", form)
 		}
 	})
 })
@@ -80,11 +80,11 @@ var _ = Describe("schema corpus", func() {
 		Expect(err).Should(Succeed())
 		Expect(errs).Should(BeEmpty(),
 			"docs/config.yml must validate against its own schema; "+
-				"a finding here means the schema is stricter than blocky (a false-positive)")
+				"a finding here means the schema is stricter than denyzer (a false-positive)")
 	})
 
 	It("accepts a deprecated top-level key (no false-positive mid-migration)", func() {
-		// `disableIPv6` is a deprecated *bool alias; blocky still accepts it.
+		// `disableIPv6` is a deprecated *bool alias; denyzer still accepts it.
 		errs, err := schema.ValidateYAML([]byte("disableIPv6: true\n"))
 		Expect(err).Should(Succeed())
 		Expect(errs).Should(BeEmpty(),

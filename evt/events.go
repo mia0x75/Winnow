@@ -21,17 +21,14 @@ const (
 	// BlockingCacheGroupChanged fires, if a list group is changed. Parameter: list type, group name, element count
 	BlockingCacheGroupChanged = "blocking:cachingGroupChanged"
 
-	// CachingDomainPrefetched fires if a domain will be prefetched, Parameter: domain name
-	CachingDomainPrefetched = "caching:prefetched"
-
 	// CachingResultCacheChanged fires if a result cache was changed, Parameter: new cache size
 	CachingResultCacheChanged = "caching:resultCacheChanged"
 
-	// CachingPrefetchCacheHit fires if a query result was found in the prefetch cache, Parameter: domain name
-	CachingPrefetchCacheHit = "caching:prefetchHit"
+	// CachingDomainPrefetched fires after a domain was prefetched. Parameter: domain name
+	CachingDomainPrefetched = "caching:domainPrefetched"
 
-	// CachingDomainsToPrefetchCountChanged fires, if a number of domains being prefetched changed, Parameter: new count
-	CachingDomainsToPrefetchCountChanged = "caching:domainsToPrefetchCountChanged"
+	// CachingPrefetchCacheHit fires if a domain was served from the prefetch cache. Parameter: domain name
+	CachingPrefetchCacheHit = "caching:prefetchCacheHit"
 
 	// CachingFailedDownloadChanged fires, if a download of a blocking list or hosts file fails
 	CachingFailedDownloadChanged = "caching:failedDownload"

@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,8 +13,8 @@ import (
 
 var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -40,11 +40,11 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 				// This stamp contains both the IP and can be used without bootstrap
 				stamp := generatePlainDNSStamp(mokaIP)
 
-				// Configure blocky with ONLY the DNS stamp - NO bootstrap DNS configured
-				// This tests the fix for issue #1979 where blocky should use the IP from the stamp
+				// Configure denyzer with ONLY the DNS stamp - NO bootstrap DNS configured
+				// This tests the fix for issue #1979 where denyzer should use the IP from the stamp
 				// instead of trying to resolve the hostname via system resolver
 				var createErr error
-				blocky, createErr = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, createErr = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: debug
 					upstreams:
@@ -58,13 +58,13 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 			})
 
 			It("should resolve DNS queries without bootstrap DNS when stamp contains IP", func(ctx context.Context) {
-				By("verifying blocky starts successfully without bootstrap DNS", func() {
-					Expect(blocky.IsRunning()).Should(BeTrue())
+				By("verifying denyzer starts successfully without bootstrap DNS", func() {
+					Expect(denyzer.IsRunning()).Should(BeTrue())
 				})
 
 				By("resolving DNS queries successfully", func() {
 					msg := util.NewMsgWithQuestion("bootstrap-test.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("bootstrap-test.com.", A, "192.168.100.1"),
@@ -74,7 +74,7 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 
 				By("resolving another query to verify consistent behavior", func() {
 					msg := util.NewMsgWithQuestion("no-bootstrap-required.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("no-bootstrap-required.com.", A, "10.20.30.40"),
@@ -115,7 +115,7 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 				stamp := generatePlainDNSStamp("[" + ipv6IP + "]")
 
 				var createErr error
-				blocky, createErr = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, createErr = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: debug
 					upstreams:
@@ -129,13 +129,13 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 			})
 
 			It("should resolve DNS queries using IPv6 from stamp", func(ctx context.Context) {
-				By("verifying blocky starts successfully", func() {
-					Expect(blocky.IsRunning()).Should(BeTrue())
+				By("verifying denyzer starts successfully", func() {
+					Expect(denyzer.IsRunning()).Should(BeTrue())
 				})
 
 				By("resolving DNS queries", func() {
 					msg := util.NewMsgWithQuestion("ipv6-stamp-test.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 				})
@@ -165,7 +165,7 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 				stamp2 := generatePlainDNSStamp(ip2)
 
 				var createErr error
-				blocky, createErr = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, createErr = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: debug
 					upstreams:
@@ -181,13 +181,13 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 			})
 
 			It("should use multiple stamp-based upstreams", func(ctx context.Context) {
-				By("verifying blocky starts successfully", func() {
-					Expect(blocky.IsRunning()).Should(BeTrue())
+				By("verifying denyzer starts successfully", func() {
+					Expect(denyzer.IsRunning()).Should(BeTrue())
 				})
 
 				By("resolving DNS queries with multiple stamp upstreams", func() {
 					msg := util.NewMsgWithQuestion("multi-stamp-test.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 					Expect(resp.Answer).Should(HaveLen(1))
@@ -225,7 +225,7 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 
 				// Configure with both stamp-based upstream and bootstrap DNS
 				var createErr error
-				blocky, createErr = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, createErr = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: debug
 					upstreams:
@@ -242,13 +242,13 @@ var _ = Describe("Bootstrap DNS tests", Label("e2e"), func() {
 			})
 
 			It("should work with both stamp upstream and bootstrap DNS configured", func(ctx context.Context) {
-				By("verifying blocky starts successfully", func() {
-					Expect(blocky.IsRunning()).Should(BeTrue())
+				By("verifying denyzer starts successfully", func() {
+					Expect(denyzer.IsRunning()).Should(BeTrue())
 				})
 
 				By("resolving DNS queries via stamp upstream", func() {
 					msg := util.NewMsgWithQuestion("with-bootstrap-test.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("with-bootstrap-test.com.", A, "192.168.50.1"),

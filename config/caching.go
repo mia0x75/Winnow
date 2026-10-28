@@ -16,7 +16,7 @@ type Caching struct {
 	CacheTimeNegative Duration `default:"30m" yaml:"cacheTimeNegative"`
 	// Maximum number of cache entries (soft limit). 0 means unlimited.
 	MaxItemsCount int `yaml:"maxItemsCount"`
-	// If true, blocky preloads DNS results for frequently queried names before they expire.
+	// If true, denyzer preloads DNS results for frequently queried names before they expire.
 	Prefetching bool `yaml:"prefetching"`
 	// Time window used to track query frequency for prefetch eligibility.
 	PrefetchExpires Duration `default:"2h" yaml:"prefetchExpires"`
@@ -53,6 +53,8 @@ func (c *Caching) LogConfig(logger *logrus.Entry) {
 	}
 }
 
+// EnablePrefetch enables prefetching, forcing caching on with a one day max TTL
+// if caching was disabled.
 func (c *Caching) EnablePrefetch() {
 	const day = Duration(24 * time.Hour)
 

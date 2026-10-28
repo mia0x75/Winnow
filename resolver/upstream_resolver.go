@@ -20,10 +20,10 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
@@ -42,7 +42,7 @@ const (
 	// before an upstream is likely to have closed them.
 	connPoolIdleTimeout = 30 * time.Second
 
-	// upstreamUDPBufferFloor is the minimum EDNS0 UDP buffer (bytes) blocky advertises to plain-DNS
+	// upstreamUDPBufferFloor is the minimum EDNS0 UDP buffer (bytes) denyzer advertises to plain-DNS
 	// upstreams, independent of what the client requested. 1232 is the DNS-flag-day-2020 value: big
 	// enough to carry most answers without truncation, small enough to avoid IP fragmentation. A
 	// shared-cache miss can then fetch the full answer over UDP instead of falling back to TCP.

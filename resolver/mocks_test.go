@@ -9,12 +9,12 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 
-	"github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/model"
 
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/mock"

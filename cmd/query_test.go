@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/sirupsen/logrus/hooks/test"
 
-	"github.com/0xERR0R/blocky/api"
+	"github.com/mia0x75/denyzer/api"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

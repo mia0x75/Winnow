@@ -1,23 +1,20 @@
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/0xERR0R/blocky/makefile.yml "Make")](https://github.com/0xERR0R/blocky/actions/workflows/makefile.yml)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/0xERR0R/blocky/release.yml "Release")](https://github.com/0xERR0R/blocky/actions/workflows/release.yml)
-[![GitHub latest version](https://img.shields.io/github/v/release/0xERR0R/blocky "Latest version")](https://github.com/0xERR0R/blocky/releases)
-[![GitHub Release Date](https://img.shields.io/github/release-date/0xERR0R/blocky "Latest release date")](https://github.com/0xERR0R/blocky/releases)
-[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/0xERR0R/blocky "Go version")](#)
-[![Docker pulls](https://img.shields.io/docker/pulls/spx01/blocky "Latest version")](https://hub.docker.com/r/spx01/blocky)
-[![Docker Image Size (latest)](https://img.shields.io/docker/image-size/spx01/blocky/latest)](https://hub.docker.com/r/spx01/blocky)
-[![Codecov](https://img.shields.io/codecov/c/gh/0xERR0R/blocky "Code coverage")](https://codecov.io/gh/0xERR0R/blocky)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/mia0x75/denyzer/makefile.yml "Make")](https://github.com/mia0x75/denyzer/actions/workflows/makefile.yml)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/mia0x75/denyzer/release.yml "Release")](https://github.com/mia0x75/denyzer/actions/workflows/release.yml)
+[![GitHub latest version](https://img.shields.io/github/v/release/mia0x75/denyzer "Latest version")](https://github.com/mia0x75/denyzer/releases)
+[![GitHub Release Date](https://img.shields.io/github/release-date/mia0x75/denyzer "Latest release date")](https://github.com/mia0x75/denyzer/releases)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/mia0x75/denyzer "Go version")](#)
+[![Docker pulls](https://img.shields.io/docker/pulls/mia0x75/denyzer "Latest version")](https://hub.docker.com/r/mia0x75/denyzer)
+[![Docker Image Size (latest)](https://img.shields.io/docker/image-size/mia0x75/denyzer/latest)](https://hub.docker.com/r/mia0x75/denyzer)
+[![Codecov](https://img.shields.io/codecov/c/gh/mia0x75/denyzer "Code coverage")](https://codecov.io/gh/mia0x75/denyzer)
 [![Codacy grade](https://img.shields.io/codacy/grade/8fcd8f8420b8419c808c47af58ed9282 "Codacy grade")](#)
-[![Go Report Card](https://goreportcard.com/badge/github.com/0xERR0R/blocky)](https://goreportcard.com/report/github.com/0xERR0R/blocky)
-[![Donation](https://img.shields.io/badge/buy%20me%20a%20coffee-donate-blueviolet.svg)](https://ko-fi.com/0xerr0r)
-[![Liberapay receiving](https://img.shields.io/liberapay/receives/spx01.svg?logo=liberapay "Support via Liberapay")](https://liberapay.com/spx01)
-
+[![Go Report Card](https://goreportcard.com/badge/github.com/mia0x75/denyzer)](https://goreportcard.com/report/github.com/mia0x75/denyzer)
 <p align="center">
-  <img height="200" src="https://github.com/0xERR0R/blocky/blob/main/docs/blocky.svg">
+  <img height="200" src="https://github.com/mia0x75/denyzer/blob/main/docs/denyzer.svg">
 </p>
 
-# Blocky
+# Denyzer
 
-Blocky is a DNS proxy and ad-blocker for the local network written in Go with following features:
+Denyzer is a DNS proxy and ad-blocker for the local network written in Go with following features:
 
 ## Features
 
@@ -38,7 +35,6 @@ Blocky is a DNS proxy and ad-blocker for the local network written in Go with fo
 
   - Customizable caching of DNS answers for queries -> improves DNS resolution speed and reduces amount of external DNS
     queries
-  - Prefetching and caching of often used queries
   - Using multiple external resolver simultaneously
   - Low memory footprint
 
@@ -58,14 +54,13 @@ Blocky is a DNS proxy and ad-blocker for the local network written in Go with fo
   - Provides DoH Endpoint
   - Uses random upstream resolvers from the configuration - increases your privacy through the distribution of your DNS
     traffic over multiple provider
-  - Blocky does **NOT** collect any user data, telemetry, statistics etc.
+  - Denyzer does **NOT** collect any user data, telemetry, statistics etc.
 
 - **Integration** - various integration
 
-  - [Prometheus](https://prometheus.io/) metrics
-  - Prepared [Grafana](https://grafana.com/) dashboards (Prometheus and database)
-  - Logging of DNS queries per day / per client in CSV format or MySQL/MariaDB/PostgreSQL/Timescale database - easy to
-    analyze
+  - Embedded web dashboard (DenyzerUI) served at `/dashboard/`
+  - Query logging to an embedded [SQLite](https://sqlite.org) store (per-day / per-client), with
+    configurable retention - no external database required
   - Various REST API endpoints
   - CLI tool
 
@@ -74,54 +69,149 @@ Blocky is a DNS proxy and ad-blocker for the local network written in Go with fo
   - Simple to maintain
   - Simple to backup
 
-- **Simple installation/configuration** - blocky was designed for simple installation
+- **Simple installation/configuration** - denyzer was designed for simple installation
 
-  - Stateless (no database, no temporary files)
+  - Single binary and embedded dashboard - no external services needed
   - Docker image with Multi-arch support
-  - Single binary
-  - Supports x86-64, ARM, and MIPS architectures -> runs fine on Raspberry PI and OpenWrt routers
+  - Supports x86-64 and ARM64 architectures -> runs fine on servers, NAS boxes and Raspberry Pi 4/5
   - Community supported Helm chart for k8s deployment
 
-## ❤️ Support Blocky
+## Architecture
 
-Blocky is **free, open source, and built entirely in my spare time** — with no telemetry, no data
-collection, and no hidden filtering. It keeps the DNS for thousands of home networks, homelabs, and
-businesses clean and private, and it always will.
+Denyzer is a single Go binary with everything embedded: the DNS proxy, the
+resolution pipeline, an embedded SQLite store and the dashboard. No external
+database, message queue or metrics service is required.
 
-Maintaining a project this size — fixing bugs, reviewing pull requests, shipping new features, and
-keeping up with security — takes a lot of time. **Thousands of people run Blocky; only a handful
-support it.** If Blocky is useful to you, please consider chipping in. Your support directly funds
-ongoing development and helps keep Blocky independent and ad-free, forever.
+### Request pipeline
 
-Even a small recurring contribution makes a real difference and is hugely appreciated. 🙏
+A DNS request passes through a chain of resolvers: client-name resolution,
+blocking (domain, deep CNAME and IP checks), conditional forwarding, custom DNS
+and hosts-file lookups, DNSSEC validation, caching and finally the upstream
+resolvers. The `stats` resolver observes every request and hands a sample to the
+statistics collector over a non-blocking channel (capacity 1024); when the
+channel is full the sample is dropped and a rate-limited warning is logged, so
+logging can never stall DNS resolution.
 
-[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/0xERR0R)
-[![Support on thanks.dev](https://img.shields.io/badge/thanks.dev-support-00A98F)](https://thanks.dev/u/gh/0xERR0R)
-[![Donate on Liberapay](https://img.shields.io/badge/Liberapay-donate-F6C915?logo=liberapay&logoColor=black)](https://liberapay.com/spx01)
-[![Buy me a coffee on Ko-fi](https://img.shields.io/badge/Ko--fi-donate-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/0xerr0r)
-[![Donate via PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/spx01)
+### Caching
 
-### 🥇 Gold sponsors
+The caches are backed by [`jellydator/ttlcache`](https://github.com/jellydator/ttlcache).
+A cache hit does not extend the TTL: the lifetime is counted from the write.
 
-<!-- gold --><a href="https://github.com/GeoffreyvanOostveen"><img src="https://github.com/GeoffreyvanOostveen.png" width="60px" alt="Gold sponsor: GeoffreyvanOostveen" /></a><!-- gold -->
+| Cache | Key | Purpose |
+| --- | --- | --- |
+| Result cache | 2-byte big-endian DNS QTYPE + lower-case FQDN | DNS answers (wire format, EDNS0 OPT stripped); TTL from the answer, clamped by `minCachingTime`/`maxCachingTime`; NXDOMAIN and empty answers use `cacheTimeNegative` |
+| Prefetch counters | same as the result cache | Sliding-window query count per key; hot entries are refreshed in the background when `prefetching` is enabled |
+| Client names | client IP | Reverse-DNS names, one hour |
+| Blocking FQDN→IP | lower-case FQDN identifier | Client-group matching for response-IP blocking |
+| DNSSEC validation | client view + names + IP + FQDN | Validation results, isolated per client view |
 
-### Sponsors
+Hits and misses are reported through callbacks, so the dashboard can show the
+current number of cached entries without maintaining a second data structure.
 
-<!-- sponsors --><a href="https://github.com/Qapf"><img src="https://github.com/Qapf.png" width="60px" alt="Sponsor: Qapf" /></a><a href="https://github.com/V-Mann-Nick"><img src="https://github.com/V-Mann-Nick.png" width="60px" alt="Sponsor: V-Mann-Nick" /></a><a href="https://github.com/bioxz"><img src="https://github.com/bioxz.png" width="60px" alt="Sponsor: bioxz" /></a><!-- sponsors -->
+### Query logging and statistics
 
-Thank you to everyone who supports Blocky! ❤️
+Query logging is asynchronous and batched. `AsyncLogWriter` buffers entries in a
+bounded channel (2000) and flushes on either `queryLog.flushInterval` or
+`queryLog.batchSize`. Before writing, the batch is aggregated in memory:
+
+- one `query_logs` row per accepted query (when `question` is listed in
+  `queryLog.fields`),
+- one metric delta per bucket for the global, domain and client dimensions at
+  minute, hour and day granularity,
+- the all-time counters and the per-query-type counters.
+
+The query-log rows and every metric delta of a flush are committed in **one
+SQLite transaction**, so the dashboard never observes a query without its
+counters (or the other way around). Cleanup runs every 12 hours, and the
+trailing window rollups are refreshed at start-up and then hourly.
+
+### Storage
+
+Denyzer stores everything in a single SQLite database (`queryLog.target`).
+`queryLog.type` defaults to `sqlite`, so a normal configuration only needs the
+target path; `console` and `none` are opt-outs that do not feed the dashboard.
+The driver is the native `mattn/go-sqlite3`, so binaries are built with CGO; the
+database runs in WAL mode with `synchronous=NORMAL`, which keeps readers
+unblocked while a batch is written.
+
+There are only two business tables:
+
+**`query_logs`** — the detail view, ordered by an auto-increment `id` that is
+also the pagination cursor. Filters (domain substring, response type, client
+name or IP, query type) are applied to the newest rows first, so a page is
+always a keyset scan rather than an offset scan.
+
+**`metrics`** — every aggregated counter. One row per
+`(granularity, dimension, bucket_start, entity)`:
+
+| Granularity | Bucket | Used for |
+| --- | --- | --- |
+| `minute` | minute start | 1-hour charts (60 points) and 24-hour charts (144 ten-minute points) |
+| `hour` | hour start | 7-day charts (168 points) and 30-day charts (720 points) |
+| `day` | local midnight | retention, daily rollups |
+| `all_time` | 0 | lifetime totals |
+| `window_7d`, `window_30d` | 0 | dashboard Top lists |
+
+Dimensions are `global`, `domain`, `client` and `query_type`. The primary key is
+ordered `(granularity, dimension, bucket_start, entity)` and the table is
+`WITHOUT ROWID`, so every hot read is a contiguous primary-key scan of the
+B-tree — series, top lists and retention deletes all avoid a second lookup.
+Counters are cumulative: an upsert adds the delta of the current batch to the
+existing row.
+
+The 7-day and 30-day Top lists used to require summing one day bucket per
+domain, which grows linearly with traffic. Two trailing-window rollups keep one
+row per domain and client instead. The writer adds each query to both windows,
+and the hourly maintenance subtracts the day that leaves the window; the result
+is an exact, independently ranked Top-N source that never prunes buckets by
+rank. After an upgrade, or whenever the stored watermark is missing, the rollup
+is rebuilt once from the day buckets; until that finishes the dashboard falls
+back to the day buckets and returns the same numbers.
+
+### Retention
+
+`queryLog.retention.historyMonths` (1–12, default 1) controls the cleanup
+window. Cleanup removes:
+
+- `query_logs` rows older than the cutoff,
+- minute and hour metric buckets older than the cutoff,
+- per-domain, per-client and per-query-type day buckets older than the cutoff,
+
+while keeping the all-time counters and the global daily metrics, so lifetime
+totals and long-term history survive forever. The cleanup keeps two extra days
+of day buckets beyond the 30-day window so the rollup can always subtract a day
+that expires.
+
+### Dashboard and API
+
+The dashboard is a Next.js static export embedded in the binary and served at
+`/dashboard/`. It reads the store through a small JSON API:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/stats/summary` | all-time counters, cache entries, blocked ratio |
+| `GET /api/stats/hourly_trend` | chart series for the selected window |
+| `GET /api/stats/top_domains` | Top domains, independently ranked for All and Blocked |
+| `GET /api/stats/top_clients` | Top clients, independently ranked for All and Blocked |
+| `GET /api/stats/search_domains`, `GET /api/stats/search_clients` | entity search over the same rollup source |
+| `GET /api/stats/query_types` | query-type breakdown |
+| `GET /api/logs/query` | paginated query log |
+| `POST /api/stats/refresh` | rebuild the dashboard snapshots |
+| `POST /api/stats/cleanup` | purge history with a chosen retention window |
+
+Top-N snapshots are cached per `dimension:window` and refreshed in the
+background (stale-while-revalidate), so switching between Top 5/10/25/50 only
+re-ranks an in-memory list. The OpenAPI/RapiDoc documentation for these endpoints
+is served alongside the regular API docs.
 
 ## Quick start
 
-You can jump to [Installation](https://0xerr0r.github.io/blocky/latest/installation/) chapter in the documentation.
+You can jump to [Installation](https://mia0x75.github.io/denyzer/latest/installation/) chapter in the documentation.
 
 ## Full documentation
 
 You can find full documentation and configuration examples
-at: [https://0xERR0R.github.io/blocky/](https://0xERR0R.github.io/blocky/)
+at: [https://mia0x75.github.io/denyzer/](https://mia0x75.github.io/denyzer/)
 
 ## Contribution
 
-Issues, feature suggestions and pull requests are welcome!
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G25XZQG)

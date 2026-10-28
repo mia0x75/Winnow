@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
 	"github.com/go-chi/chi/v5"
+	"github.com/mia0x75/denyzer/config"
 	"github.com/rs/cors"
 )
 
@@ -78,7 +78,7 @@ func secureHeadersMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Strict-Transport-Security", "max-age=63072000")
 			w.Header().Set("X-Frame-Options", "DENY")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
-			w.Header().Set("x-xss-protection", "1; mode=block")
+			w.Header().Set("X-XSS-Protection", "1; mode=block")
 		}
 
 		next.ServeHTTP(w, r)
@@ -101,7 +101,7 @@ func newCORSMiddleware() httpMiddleware {
 		AllowedOrigins: []string{"*"},
 		// Allow Chromium's Private Network Access preflights, sent when a
 		// public site addresses a private IP (e.g. a hosted Grafana
-		// dashboard calling the blocky API on a LAN)
+		// dashboard calling the denyzer API on a LAN)
 		AllowPrivateNetwork: true,
 		ExposedHeaders:      []string{"Link"},
 		MaxAge:              int(corsMaxAge.Seconds()),

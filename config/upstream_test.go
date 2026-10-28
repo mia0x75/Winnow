@@ -659,7 +659,7 @@ var _ = Describe("ParseUpstream", func() {
 			})
 		})
 
-		// https://github.com/0xERR0R/blocky/issues/2052:
+		// https://github.com/mia0x75/denyzer/issues/2052:
 		//   - the optional port lives on the hostname field, not addr (draft-denis-dns-stamps §4.3.2)
 		//   - the stamp's optional bootstrap IPs are used for bootstrapping
 		Describe("issue #2052: port on hostname and bootstrap IPs", func() {
@@ -767,7 +767,7 @@ var _ = Describe("ParseUpstream", func() {
 			It("tolerates a legacy DoH stamp that encodes the port on the addr field", func() {
 				// Emitted by an older go-dnsstamps that put the port on the addr field
 				// (ServerAddrStr "1.1.1.1:8443", ProviderName "cloudflare-dns.com").
-				// Current upstream rejects this layout per spec; blocky must still accept it.
+				// Current upstream rejects this layout per spec; denyzer must still accept it.
 				const legacy = "sdns://AgAAAAAAAAAADDEuMS4xLjE6ODQ0MyABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBARJjbG91ZGZsYXJlLWRucy5jb20KL2Rucy1xdWVyeQ"
 
 				result, err := ParseUpstream(legacy)

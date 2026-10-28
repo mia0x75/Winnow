@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xERR0R/blocky/config"
+	"github.com/mia0x75/denyzer/config"
 )
 
 func BenchmarkRefresh(b *testing.B) {

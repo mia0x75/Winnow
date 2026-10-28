@@ -4,13 +4,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/0xERR0R/blocky/helpertest"
+	"github.com/mia0x75/denyzer/helpertest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-// Reproduces #2218: the Docker image runs `blocky healthcheck` with no flags, but the
+// Reproduces #2218: the Docker image runs `denyzer healthcheck` with no flags, but the
 // command defaults to port 53 and never looks at `ports.dns`, so a container that
 // listens on a different DNS port is reported unhealthy.
 var _ = Describe("Healthcheck derives the port from the config (#2218)", func() {
@@ -21,7 +21,7 @@ var _ = Describe("Healthcheck derives the port from the config (#2218)", func() 
 		cfgFile = filepath.Join(dir, "config.yml")
 		Expect(os.WriteFile(cfgFile, []byte(body), 0o600)).Should(Succeed())
 
-		GinkgoT().Setenv("BLOCKY_CONFIG_FILE", cfgFile)
+		GinkgoT().Setenv("DENYZER_CONFIG_FILE", cfgFile)
 
 		// initConfig() only consults the env var while configPath is still the default.
 		old := configPath
@@ -83,7 +83,7 @@ var _ = Describe("Healthcheck derives the port from the config (#2218)", func() 
 			Expect(srv.ListenAndServe()).Should(Succeed())
 		}()
 
-		GinkgoT().Setenv("BLOCKY_CONFIG_FILE", filepath.Join(GinkgoT().TempDir(), "does-not-exist.yml"))
+		GinkgoT().Setenv("DENYZER_CONFIG_FILE", filepath.Join(GinkgoT().TempDir(), "does-not-exist.yml"))
 		old := configPath
 		configPath = defaultConfigPath
 		DeferCleanup(func() { configPath = old })

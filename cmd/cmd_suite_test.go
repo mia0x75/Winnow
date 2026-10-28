@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/spf13/cobra"
 
 	. "github.com/onsi/ginkgo/v2"

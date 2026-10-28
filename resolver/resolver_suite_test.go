@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/go-redis/redis/v8"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,7 +20,6 @@ var defaultUpstreamsConfig config.Upstreams
 
 func init() {
 	log.Silence()
-	redis.SetLogger(NoLogs{})
 
 	var err error
 

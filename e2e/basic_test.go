@@ -5,8 +5,8 @@ import (
 	"net"
 	"net/http"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
@@ -14,9 +14,9 @@ import (
 
 var _ = Describe("Basic functionality", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -34,8 +34,8 @@ var _ = Describe("Basic functionality", func() {
 		Describe("Container startup", func() {
 			Context("with conflicting port configuration", func() {
 				BeforeEach(func(ctx context.Context) {
-					// Create blocky with the same port for HTTP and DNS
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					// Create denyzer with the same port for HTTP and DNS
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -47,22 +47,22 @@ var _ = Describe("Basic functionality", func() {
 					Expect(err).Should(HaveOccurred())
 
 					// Verify container exit status
-					state, err := blocky.State(ctx)
+					state, err := denyzer.State(ctx)
 					Expect(err).Should(Succeed())
 					Expect(state.ExitCode).Should(Equal(1))
 				})
 
 				It("fails to start with appropriate error message", func(ctx context.Context) {
-					Eventually(blocky.IsRunning, "5s", "2ms").Should(BeFalse())
-					Expect(getContainerLogs(ctx, blocky)).
+					Eventually(denyzer.IsRunning, "5s", "2ms").Should(BeFalse())
+					Expect(getContainerLogs(ctx, denyzer)).
 						Should(ContainElement(ContainSubstring("address already in use")))
 				})
 			})
 
 			Context("with minimal configuration", func() {
 				BeforeEach(func(ctx context.Context) {
-					// Create blocky with minimal config
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					// Create denyzer with minimal config
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -74,7 +74,7 @@ var _ = Describe("Basic functionality", func() {
 				It("starts successfully and resolves DNS queries", func(ctx context.Context) {
 					msg := util.NewMsgWithQuestion("google.de.", A)
 
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.de.", A, "1.2.3.4"),
@@ -84,7 +84,7 @@ var _ = Describe("Basic functionality", func() {
 
 				It("reports 'healthy' status via container healthcheck", func(ctx context.Context) {
 					Eventually(func(g Gomega) string {
-						state, err := blocky.State(ctx)
+						state, err := denyzer.State(ctx)
 						g.Expect(err).NotTo(HaveOccurred())
 
 						return string(state.Health.Status)
@@ -96,7 +96,7 @@ var _ = Describe("Basic functionality", func() {
 		Describe("HTTP port configuration", func() {
 			Context("when HTTP port is not defined", func() {
 				BeforeEach(func(ctx context.Context) {
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -106,7 +106,7 @@ var _ = Describe("Basic functionality", func() {
 				})
 
 				It("does not expose HTTP service", func(ctx context.Context) {
-					host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+					host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 					Expect(err).Should(Succeed())
 
 					_, err = http.Get("http://" + net.JoinHostPort(host, port))
@@ -116,7 +116,7 @@ var _ = Describe("Basic functionality", func() {
 
 			Context("when HTTP port is defined", func() {
 				BeforeEach(func(ctx context.Context) {
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						upstreams:
 						  groups:
 						    default:
@@ -128,7 +128,7 @@ var _ = Describe("Basic functionality", func() {
 				})
 
 				It("serves HTTP content on configured port", func(ctx context.Context) {
-					host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+					host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 					Expect(err).Should(Succeed())
 					url := "http://" + net.JoinHostPort(host, port)
 
@@ -168,7 +168,7 @@ var _ = Describe("Basic functionality", func() {
 
 		Context("when privacy mode is enabled", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -184,14 +184,14 @@ var _ = Describe("Basic functionality", func() {
 				msg := util.NewMsgWithQuestion("google.com.", A)
 
 				// Make two requests to ensure consistent behavior
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("google.com.", A, "1.2.3.4"),
 							HaveTTL(BeNumerically("==", 123)),
 						))
 
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("google.com.", A, "1.2.3.4"),
@@ -199,8 +199,8 @@ var _ = Describe("Basic functionality", func() {
 						))
 
 				// Verify logs don't contain sensitive information
-				Expect(getContainerLogs(ctx, blocky)).ShouldNot(ContainElement(ContainSubstring("google.com")))
-				Expect(getContainerLogs(ctx, blocky)).ShouldNot(ContainElement(ContainSubstring("1.2.3.4")))
+				Expect(getContainerLogs(ctx, denyzer)).ShouldNot(ContainElement(ContainSubstring("google.com")))
+				Expect(getContainerLogs(ctx, denyzer)).ShouldNot(ContainElement(ContainSubstring("1.2.3.4")))
 			})
 		})
 	})

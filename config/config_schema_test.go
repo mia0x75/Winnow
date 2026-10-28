@@ -78,12 +78,12 @@ ports:
 
 	When("a config exercises flexible/edge value forms not covered by docs/config.yml", func() {
 		It("is accepted by both the parser and the schema (permissive-superset)", func() {
-			// testdata/superset_config.yml uses the alternative forms blocky
+			// testdata/superset_config.yml uses the alternative forms denyzer
 			// accepts (bare-number durations, quoted ECS masks, quoted NULL
 			// query type, string TLS version, comma-string listen/mappings,
 			// deprecated keys). unmarshalConfig both parses (UnmarshalStrict)
 			// and warns on any schema divergence, so this asserts the schema is
-			// a true superset of what blocky accepts for all of them.
+			// a true superset of what denyzer accepts for all of them.
 			data, err := os.ReadFile("testdata/superset_config.yml")
 			Expect(err).Should(Succeed())
 

@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("Upstream resolver configuration tests", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -25,7 +25,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 	Describe("'upstreams.init.strategy' parameter handling", func() {
 		When("'upstreams.init.strategy' is fast and upstream server as IP is not reachable", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -38,15 +38,15 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				Expect(err).Should(Succeed())
 			})
 			It("should start even if upstream server is not reachable", func(ctx context.Context) {
-				Expect(blocky.IsRunning()).Should(BeTrue())
+				Expect(denyzer.IsRunning()).Should(BeTrue())
 				Eventually(ctx, func() ([]string, error) {
-					return getContainerLogs(ctx, blocky)
+					return getContainerLogs(ctx, denyzer)
 				}).Should(ContainElement(ContainSubstring("initial resolver test failed")))
 			})
 		})
 		When("'upstreams.init.strategy' is fast and upstream server as host name is not reachable", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -59,15 +59,15 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				Expect(err).Should(Succeed())
 			})
 			It("should start even if upstream server is not reachable", func(ctx context.Context) {
-				Expect(blocky.IsRunning()).Should(BeTrue())
+				Expect(denyzer.IsRunning()).Should(BeTrue())
 				Eventually(ctx, func() ([]string, error) {
-					return getContainerLogs(ctx, blocky)
+					return getContainerLogs(ctx, denyzer)
 				}).Should(ContainElement(ContainSubstring("initial resolver test failed")))
 			})
 		})
 		When("'upstreams.init.strategy' is failOnError and upstream as IP address server is not reachable", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -78,14 +78,14 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				Expect(err).Should(HaveOccurred())
 			})
 			It("should not start", func(ctx context.Context) {
-				Expect(blocky.IsRunning()).Should(BeFalse())
-				Expect(getContainerLogs(ctx, blocky)).
+				Expect(denyzer.IsRunning()).Should(BeFalse())
+				Expect(getContainerLogs(ctx, denyzer)).
 					Should(ContainElement(ContainSubstring("no valid upstream for group default")))
 			})
 		})
 		When("'upstreams.init.strategy' is failOnError and upstream server as host name is not reachable", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -96,8 +96,8 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				Expect(err).Should(HaveOccurred())
 			})
 			It("should not start", func(ctx context.Context) {
-				Expect(blocky.IsRunning()).Should(BeFalse())
-				Expect(getContainerLogs(ctx, blocky)).
+				Expect(denyzer.IsRunning()).Should(BeFalse())
+				Expect(getContainerLogs(ctx, denyzer)).
 					Should(ContainElement(ContainSubstring("no valid upstream for group default")))
 			})
 		})
@@ -109,7 +109,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				`A delay.com/delay(NOERROR("A 1.1.1.1 100"), "300ms")`)
 			Expect(err).Should(Succeed())
 
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -121,7 +121,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 		It("should consider the timeout parameter", func(ctx context.Context) {
 			By("query without timeout", func() {
 				msg := util.NewMsgWithQuestion("example.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("example.com.", A, "1.2.3.4"),
@@ -132,7 +132,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 			By("query with timeout", func() {
 				msg := util.NewMsgWithQuestion("delay.com.", A)
 
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Rcode).Should(Equal(dns.RcodeServerFailure))
 			})
@@ -151,7 +151,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 					`A random.com/NOERROR("A 2.2.2.2 100")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -173,7 +173,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 
 					for range attempts {
 						msg := util.NewMsgWithQuestion("random.com.", A)
-						resp, err := doDNSRequest(ctx, blocky, msg)
+						resp, err := doDNSRequest(ctx, denyzer, msg)
 						Expect(err).Should(Succeed())
 						Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 						Expect(resp.Answer).Should(HaveLen(1))
@@ -206,7 +206,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 					`A strict.com/NOERROR("A 3.3.3.3 100")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -226,7 +226,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 
 					for range attempts {
 						msg := util.NewMsgWithQuestion("strict.com.", A)
-						Expect(doDNSRequest(ctx, blocky, msg)).
+						Expect(doDNSRequest(ctx, denyzer, msg)).
 							Should(
 								SatisfyAll(
 									BeDNSRecord("strict.com.", A, "1.1.1.1"),
@@ -247,7 +247,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 					`A fallback.com/NOERROR("A 2.2.2.2 100")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -262,7 +262,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 			})
 			It("should fall back to next upstream when first fails", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("fallback.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("fallback.com.", A, "2.2.2.2"),
@@ -283,7 +283,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 					`A parallel.com/delay(NOERROR("A 3.3.3.3 100"), "50ms")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -305,7 +305,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 
 				for range attempts {
 					msg := util.NewMsgWithQuestion("parallel.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Response should be successful (from moka1 or moka3)
@@ -342,7 +342,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				// Generate DNS stamp pointing to the mokka container's IP
 				stamp := generatePlainDNSStamp(mokaIP)
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet,
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet,
 					dedent(`
 					upstreams:
 					  groups:
@@ -357,7 +357,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 			It("should resolve DNS queries via DNS stamp upstream", func(ctx context.Context) {
 				By("resolving a domain via stamp-based upstream", func() {
 					msg := util.NewMsgWithQuestion("stamp-test.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("stamp-test.com.", A, "10.11.12.13"),
@@ -388,7 +388,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 				// to verify they work together in the same configuration
 				stamp := generatePlainDNSStamp(mokaStampIP)
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet,
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet,
 					dedent(`
 					upstreams:
 					  groups:
@@ -411,7 +411,7 @@ var _ = Describe("Upstream resolver configuration tests", func() {
 
 					for range attempts {
 						msg := util.NewMsgWithQuestion("mixed-test.com.", A)
-						resp, err := doDNSRequest(ctx, blocky, msg)
+						resp, err := doDNSRequest(ctx, denyzer, msg)
 						Expect(err).Should(Succeed())
 						Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 						Expect(resp.Answer).Should(HaveLen(1))

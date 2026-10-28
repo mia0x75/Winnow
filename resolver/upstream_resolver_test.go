@@ -14,11 +14,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/log"
-	. "github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/log"
+	. "github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1205,7 +1205,7 @@ var _ = Describe("UpstreamResolver connection pooling", Label("upstreamResolver"
 			Expect(sut.Resolve(ctx, newRequest("example.com.", A))).
 				Should(HaveReturnCode(dns.RcodeSuccess))
 
-			// The upstream drops the idle connection blocky still has pooled. The
+			// The upstream drops the idle connection denyzer still has pooled. The
 			// next query goes out on it and fails without ever being served.
 			mock.KillOpenConns()
 

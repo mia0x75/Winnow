@@ -1,7 +1,7 @@
 package config
 
 import (
-	. "github.com/0xERR0R/blocky/helpertest"
+	. "github.com/mia0x75/denyzer/helpertest"
 
 	"github.com/creasty/defaults"
 	. "github.com/onsi/ginkgo/v2"

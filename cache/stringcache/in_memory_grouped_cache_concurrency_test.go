@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/0xERR0R/blocky/cache/stringcache"
+	"github.com/mia0x75/denyzer/cache/stringcache"
 )
 
 // TestInMemoryGroupedCacheConcurrentRefreshAndLookup exercises lookups running

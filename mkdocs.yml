@@ -1,5 +1,5 @@
-site_name: blocky
-site_description: blocky Documentation
+site_name: denyzer
+site_description: denyzer Documentation
 theme:
   name: material
   features:
@@ -40,12 +40,12 @@ extra:
     provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/0xERR0R/blocky
+      link: https://github.com/mia0x75/denyzer
     - icon: simple/codeberg
-      link: https://codeberg.org/0xERR0R/blocky
+      link: https://codeberg.org/mia0x75/denyzer
     - icon: fontawesome/brands/docker
-      link: https://hub.docker.com/r/spx01/blocky
-repo_url: https://github.com/0xERR0R/blocky
+      link: https://hub.docker.com/r/mia0x75/denyzer
+repo_url: https://github.com/mia0x75/denyzer
 edit_uri: edit/main/docs/
 
 markdown_extensions:
@@ -77,7 +77,6 @@ nav:
   - "Welcome": "index.md"
   - "Configuration": "configuration.md"
   - "Installation": "installation.md"
-  - "Prometheus / Grafana": "prometheus_grafana.md"
   - "Interfaces": "interfaces.md"
   - "Network configuration": "network_configuration.md"
   - "Additional information": "additional_information.md"

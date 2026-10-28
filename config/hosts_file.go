@@ -1,8 +1,8 @@
 package config
 
 import (
-	. "github.com/0xERR0R/blocky/config/migration"
-	"github.com/0xERR0R/blocky/log"
+	. "github.com/mia0x75/denyzer/config/migration"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/sirupsen/logrus"
 )
 

@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("Query type filtering", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -31,7 +31,7 @@ var _ = Describe("Query type filtering", func() {
 
 	When("AAAA filtering is configured", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -45,7 +45,7 @@ var _ = Describe("Query type filtering", func() {
 
 		It("should filter AAAA queries and return empty response", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("example.com.", AAAA)
-			resp, err := doDNSRequest(ctx, blocky, msg)
+			resp, err := doDNSRequest(ctx, denyzer, msg)
 			Expect(err).Should(Succeed())
 			Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 			Expect(resp.Answer).Should(BeEmpty())
@@ -53,7 +53,7 @@ var _ = Describe("Query type filtering", func() {
 
 		It("should pass through A queries normally", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("example.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(
 					SatisfyAll(
 						BeDNSRecord("example.com.", A, "1.2.3.4"),
@@ -64,7 +64,7 @@ var _ = Describe("Query type filtering", func() {
 
 	When("multiple query types are filtered", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -80,21 +80,21 @@ var _ = Describe("Query type filtering", func() {
 		It("should filter all configured query types", func(ctx context.Context) {
 			By("filtering AAAA queries", func() {
 				msg := util.NewMsgWithQuestion("example.com.", AAAA)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Answer).Should(BeEmpty())
 			})
 
 			By("filtering MX queries", func() {
 				msg := util.NewMsgWithQuestion("example.com.", MX)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Answer).Should(BeEmpty())
 			})
 
 			By("passing through A queries", func() {
 				msg := util.NewMsgWithQuestion("example.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("example.com.", A, "1.2.3.4"))
 			})
 		})
@@ -102,7 +102,7 @@ var _ = Describe("Query type filtering", func() {
 
 	When("no filtering is configured", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -114,13 +114,13 @@ var _ = Describe("Query type filtering", func() {
 		It("should pass through all query types", func(ctx context.Context) {
 			By("resolving A queries", func() {
 				msg := util.NewMsgWithQuestion("example.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("example.com.", A, "1.2.3.4"))
 			})
 
 			By("resolving AAAA queries", func() {
 				msg := util.NewMsgWithQuestion("example.com.", AAAA)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("example.com.", AAAA, "2001:db8::1"))
 			})
 		})

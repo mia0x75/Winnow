@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
 	"github.com/invopop/jsonschema"
+	"github.com/mia0x75/denyzer/config"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 )
 
-// qtypeNames returns the sorted DNS query-type names blocky accepts. It is the
+// qtypeNames returns the sorted DNS query-type names denyzer accepts. It is the
 // exact set QType.UnmarshalText looks up in dns.StringToType, so a schema enum
 // built from it can never be a false-positive.
 func qtypeNames() []string {
@@ -86,7 +86,7 @@ func bootstrappedUpstreamSchema() *jsonschema.Schema {
 //
 // MAINTENANCE: these registries are the manual extension point. When you add a
 // new config type that does NOT serialize as a plain JSON object, register it
-// here, otherwise the generated schema becomes stricter than blocky (a
+// here, otherwise the generated schema becomes stricter than denyzer (a
 // false-positive):
 //   - custom UnmarshalText-from-string -> stringForms  (plain string)
 //   - string-or-array / map / object   -> complexForms (the flexible shapes)
@@ -127,7 +127,7 @@ func stringForms() map[reflect.Type]stringSpec {
 		},
 		reflect.TypeFor[config.BytesSource](): {
 			"Source: an http(s) URL, a local file path, or an inline YAML block.",
-			[]string{"https://example.com/list.txt", "/etc/blocky/list.txt"},
+			[]string{"https://example.com/list.txt", "/etc/denyzer/list.txt"},
 		},
 		reflect.TypeFor[config.Weekday](): {
 			"Day of week: mon, tue, wed, thu, fri, sat, sun.", []string{"mon", "sat"},
@@ -216,7 +216,7 @@ func makeMapper() func(reflect.Type) *jsonschema.Schema {
 		}
 
 		// go-enum string types are detected generically via EnumValues().
-		if ev, ok := reflect.New(t).Elem().Interface().(enumValuer); ok {
+		if ev, ok := reflect.TypeAssert[enumValuer](reflect.New(t).Elem()); ok {
 			return enumStringSchema(ev.EnumValues())
 		}
 
@@ -290,7 +290,7 @@ func typedDefault(def, schemaType string) any {
 
 // markDeprecated walks the schema and Go type in parallel, marking the fields
 // of every inline `Deprecated` struct as deprecated. invopop flattens these
-// `yaml:",inline"` blocks into their parent's properties (so blocky still
+// `yaml:",inline"` blocks into their parent's properties (so denyzer still
 // accepts the keys) but does not carry the deprecation, so editors wouldn't
 // strike them through. This covers the nested blocks (Blocking, HostsFile);
 // the top-level Config.Deprecated is also re-marked here, idempotently with
@@ -372,7 +372,7 @@ func applyEnumDescriptions(s *jsonschema.Schema, t reflect.Type) {
 		return
 	}
 
-	if ed, ok := reflect.New(t).Elem().Interface().(enumDescriptioner); ok {
+	if ed, ok := reflect.TypeAssert[enumDescriptioner](reflect.New(t).Elem()); ok {
 		if legend := ed.EnumDescriptions(); len(legend) > 0 && len(s.Enum) > 0 {
 			s.Description = withEnumLegend(s.Description, legend, s.Enum)
 		}
@@ -428,7 +428,7 @@ func withEnumLegend(existing string, legend map[string]string, enum []any) strin
 // (which invopop does NOT flatten automatically — it only flattens embedded
 // fields) and merges its fields into the root schema as deprecated top-level
 // properties. yaml.v2 inlines them, so they are valid top-level keys; this
-// keeps the schema a superset of what blocky accepts and lets editors strike
+// keeps the schema a superset of what denyzer accepts and lets editors strike
 // them through.
 func flattenDeprecated(r *jsonschema.Reflector, root *jsonschema.Schema) {
 	depField, ok := reflect.TypeFor[config.Config]().FieldByName("Deprecated")

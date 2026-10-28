@@ -5,9 +5,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 )
 
@@ -91,10 +91,10 @@ var (
 		// RFC 9462 (Discovery of Designated Resolvers)
 		// https://www.rfc-editor.org/rfc/rfc9462
 		//
-		// Sections 4, 6.1 and 6.4: blocky advertises no Designated Resolvers,
+		// Sections 4, 6.1 and 6.4: denyzer advertises no Designated Resolvers,
 		// so reply NODATA across the whole zone and never forward upstream
 		// (forwarded answers would fail the client's cert SAN check anyway
-		// and let stub resolvers bypass blocky).
+		// and let stub resolvers bypass denyzer).
 		"resolver.arpa.": sudnNoData,
 	}
 )

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	. "github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	. "github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -210,7 +210,7 @@ var _ = Describe("SudnResolver", Label("sudnResolver"), func() {
 		})
 
 		// RFC 9462: Discovery of Designated Resolvers (DDR).
-		// Section 4 + 6.1 + 6.4: blocky has no Designated Resolvers to announce
+		// Section 4 + 6.1 + 6.4: denyzer has no Designated Resolvers to announce
 		// and MUST NOT forward queries for `resolver.arpa.` upstream. Reply
 		// NODATA (NOERROR + empty Answer) for every QTYPE across the zone.
 		DescribeTable("RFC 9462 resolver.arpa zone (NODATA)",

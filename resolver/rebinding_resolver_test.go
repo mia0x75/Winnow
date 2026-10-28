@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/log"
-	. "github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/log"
+	. "github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
@@ -480,7 +480,7 @@ var _ = Describe("RebindingProtectionResolver", func() {
 			cachingCfg, err := config.WithDefaults[config.Caching]()
 			Expect(err).Should(Succeed())
 
-			cachingRes, err := NewCachingResolver(ctx, cachingCfg, config.DNSSEC{}, nil)
+			cachingRes, err := NewCachingResolver(ctx, cachingCfg, config.DNSSEC{})
 			Expect(err).Should(Succeed())
 
 			chained := Chain(sut, cachingRes, m)
@@ -524,7 +524,7 @@ var _ = Describe("RebindingProtectionResolver", func() {
 			cachingCfg, err := config.WithDefaults[config.Caching]()
 			Expect(err).Should(Succeed())
 
-			cachingRes, err := NewCachingResolver(ctx, cachingCfg, config.DNSSEC{}, nil)
+			cachingRes, err := NewCachingResolver(ctx, cachingCfg, config.DNSSEC{})
 			Expect(err).Should(Succeed())
 
 			chained := Chain(sut, cachingRes, m)

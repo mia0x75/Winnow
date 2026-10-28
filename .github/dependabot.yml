@@ -6,7 +6,7 @@ updates:
     interval: daily
   open-pull-requests-limit: 10
   assignees:
-  - 0xERR0R
+  - mia0x75
   labels:
   - "dependencies"
   - "go"

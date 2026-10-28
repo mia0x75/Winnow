@@ -185,7 +185,7 @@ func resolveNode(node *yaml.Node, state *resolveState) (*yaml.Node, error) {
 // checkDuplicateKeys rejects duplicate scalar keys within any mapping in the
 // tree, mirroring yaml.v2's strict-mode wording. yaml.v2 no longer sees the
 // raw documents (it only parses the re-encoded merge), so this restores that
-// safety net. Non-scalar keys (legal YAML, absent from blocky configs) are not
+// safety net. Non-scalar keys (legal YAML, absent from denyzer configs) are not
 // matched.
 func checkDuplicateKeys(node *yaml.Node) error {
 	switch node.Kind {

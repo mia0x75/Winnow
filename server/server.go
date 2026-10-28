@@ -13,19 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xERR0R/blocky/cache"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/metrics"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/redis"
-	"github.com/0xERR0R/blocky/resolver"
-	"github.com/0xERR0R/blocky/server/freebind"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/resolver"
+	"github.com/mia0x75/denyzer/server/freebind"
 
-	"github.com/0xERR0R/blocky/util"
-	goredis "github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/miekg/dns"
@@ -77,7 +73,7 @@ type NewServerFunc func(address string) (*dns.Server, error)
 
 func retrieveCertificate(cfg *config.Config) (cert tls.Certificate, err error) {
 	if cfg.CertFile == "" && cfg.KeyFile == "" {
-		cert, err = util.TLSGenerateSelfSignedCert([]string{"blocky.invalid", "*"})
+		cert, err = util.TLSGenerateSelfSignedCert([]string{"denyzer.invalid", "*"})
 		if err != nil {
 			return tls.Certificate{}, fmt.Errorf("unable to generate self-signed certificate: %w", err)
 		}
@@ -139,31 +135,12 @@ func NewServer(ctx context.Context, cfg *config.Config) (server *Server, err err
 		return nil, fmt.Errorf("failed to create HTTP/HTTPS listeners: %w", err)
 	}
 
-	metrics.RegisterEventListeners()
-
 	bootstrap, err := resolver.NewBootstrap(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bootstrap resolver: %w", err)
 	}
 
-	var redisConn *goredis.Client
-	if cfg.Redis.IsEnabled() {
-		redisConn, err = redis.New(ctx, &cfg.Redis)
-		if err != nil {
-			if cfg.Redis.Required {
-				return nil, fmt.Errorf("failed to create required Redis client: %w", err)
-			}
-
-			logger().WithError(err).Warn("Redis is enabled but optional and could not be initialized, continuing without Redis")
-		}
-	}
-
-	redisResult, err := createRedisCacheDecorator(ctx, redisConn, cfg.Redis.Required)
-	if err != nil {
-		return nil, err
-	}
-
-	queryResolver, queryError := createQueryResolver(ctx, cfg, bootstrap, redisResult.decorator)
+	queryResolver, queryError := createQueryResolver(ctx, cfg, bootstrap)
 	if queryError != nil {
 		return nil, queryError
 	}
@@ -176,14 +153,6 @@ func NewServer(ctx context.Context, cfg *config.Config) (server *Server, err err
 		http3PacketConns: http3PacketConns,
 	}
 
-	if redisResult.bridge != nil {
-		server.closers = append(server.closers, redisResult.bridge)
-	}
-
-	if redisConn != nil {
-		server.closers = append(server.closers, redisConn)
-	}
-
 	server.printConfiguration()
 
 	server.registerDNSHandlers(ctx)
@@ -193,7 +162,12 @@ func NewServer(ctx context.Context, cfg *config.Config) (server *Server, err err
 		return nil, fmt.Errorf("failed to create OpenAPI interface implementation: %w", err)
 	}
 
-	httpRouter := createHTTPRouter(cfg, openAPIImpl)
+	var listCounts listCountsProvider
+	if lc, lcErr := resolver.GetFromChainWithType[listCountsProvider](server.queryResolver); lcErr == nil {
+		listCounts = lc
+	}
+
+	httpRouter := createHTTPRouter(openAPIImpl, listCounts, server.cacheEntryCount)
 	server.registerDoHEndpoints(httpRouter, cfg)
 
 	if len(http3PacketConns) > 0 {
@@ -454,42 +428,10 @@ func createUDPServer(ctx context.Context, address string, opts listenerOptions) 
 	return createDNSServer(ctx, networkUDP, address, nil, opts)
 }
 
-type redisBridgeResult struct {
-	decorator resolver.CacheDecorator
-	bridge    *redis.EventBusBridge
-}
-
-func createRedisCacheDecorator(
-	ctx context.Context, redisConn *goredis.Client, required bool,
-) (*redisBridgeResult, error) {
-	if redisConn == nil {
-		return &redisBridgeResult{}, nil
-	}
-
-	bridge, err := redis.NewEventBusBridge(ctx, redisConn)
-	if err != nil {
-		if required {
-			return nil, fmt.Errorf("failed to create required Redis event bridge: %w", err)
-		}
-
-		logger().Warn("failed to create Redis event bridge: ", err)
-	}
-
-	decorator := func(inner cache.ExpiringCache[[]byte]) (cache.ExpiringCache[[]byte], error) {
-		return cache.NewRedisExpiringByteCache(ctx, inner, redisConn, cache.RedisOptions[[]byte]{
-			Prefix:  "blocky:cache:",
-			Channel: "blocky_cache_sync",
-		})
-	}
-
-	return &redisBridgeResult{decorator: decorator, bridge: bridge}, nil
-}
-
 func createQueryResolver(
 	ctx context.Context,
 	cfg *config.Config,
 	bootstrap *resolver.Bootstrap,
-	cacheDecorator resolver.CacheDecorator,
 ) (resolver.ChainedResolver, error) {
 	upstreamTree, utErr := resolver.NewUpstreamTreeResolver(ctx, cfg.Upstreams, bootstrap)
 	blocking, blErr := resolver.NewBlockingResolver(ctx, cfg.Blocking, bootstrap)
@@ -500,14 +442,8 @@ func createQueryResolver(
 	// client name resolution consults local reverse sources (custom DNS, hosts file) before the rDNS upstream
 	clientNames, cnErr := resolver.NewClientNamesResolver(
 		ctx, cfg.ClientLookup, cfg.Upstreams, bootstrap, customDNS, hostsFile)
-	decorator := cacheDecorator
-	if !cfg.Caching.IsEnabled() {
-		decorator = nil
-	}
 
-	// cfg.DNSSEC gates the DO bit on prefetch reloads (they bypass the DNSSEC
-	// resolver above the cache).
-	cachingResolver, crErr := resolver.NewCachingResolver(ctx, cfg.Caching, cfg.DNSSEC, decorator)
+	cachingResolver, crErr := resolver.NewCachingResolver(ctx, cfg.Caching, cfg.DNSSEC)
 	// Pass upstreamTree to DNSSEC resolver so it can query for DNSKEY/DS records
 	dnssecResolver, dsErr := resolver.NewDNSSECResolver(ctx, cfg.DNSSEC, upstreamTree)
 
@@ -547,14 +483,13 @@ func createQueryResolver(
 		resolver.NewFQDNOnlyResolver(cfg.FQDNOnly),
 		resolver.NewEDEResolver(cfg.EDE),
 		queryLogging,
-		resolver.NewMetricsResolver(cfg.Prometheus),
 		customDNS,
 		hostsFile,
 		// above blocking and the cache: it inspects only RESOLVED/CACHED answers
 		// (conditional/custom DNS/hosts file/SUDN/blocked answers are recognized
 		// by response type and pass through; the cache stores only
 		// upstream-derived answers, so CACHED implies upstream origin), cached
-		// answers — incl. entries synced via redis — are re-inspected on every
+		// answers — are re-inspected on every
 		// hit, and blocking's internal FQDN client-identifier lookups enter the
 		// chain below it
 		resolver.NewRebindingProtectionResolver(cfg.RebindingProtection),
@@ -578,7 +513,7 @@ func (s *Server) registerDNSHandlers(ctx context.Context) {
 		handler.HandleFunc(".", func(w dns.ResponseWriter, m *dns.Msg) {
 			s.OnRequest(ctx, w, m)
 		})
-		handler.HandleFunc("healthcheck.blocky", func(w dns.ResponseWriter, m *dns.Msg) {
+		handler.HandleFunc("healthcheck.denyzer", func(w dns.ResponseWriter, m *dns.Msg) {
 			s.OnHealthCheck(ctx, w, m)
 		})
 	}
@@ -586,11 +521,6 @@ func (s *Server) registerDNSHandlers(ctx context.Context) {
 
 func (s *Server) printConfiguration() {
 	logger().Info("current configuration:")
-
-	if s.cfg.Redis.IsEnabled() {
-		logger().Info("Redis:")
-		log.WithIndent(logger(), "  ", s.cfg.Redis.LogConfig)
-	}
 
 	resolver.ForEach(s.queryResolver, func(res resolver.Resolver) {
 		resolver.LogResolverConfig(res, logger())
@@ -829,8 +759,8 @@ func (s *Server) resolve(ctx context.Context, request *model.Request) (response 
 	// up front: the response is normalized against that, not the mutated request.
 	query := newClientQuery(request)
 
-	// Blocky doesn't implement DNS Cookies (RFC 7873), so a Server Cookie a client returns is one
-	// an upstream issued and blocky can neither validate nor reissue it. Forwarding it is worse
+	// Denyzer doesn't implement DNS Cookies (RFC 7873), so a Server Cookie a client returns is one
+	// an upstream issued and denyzer can neither validate nor reissue it. Forwarding it is worse
 	// than dropping it: it is likely to reach a different upstream than the one that issued it
 	// (`parallel_best` picks at random), which can't validate it either and may answer BADCOOKIE.
 	// The OPT record itself is kept, since it still carries the DO bit and the buffer size the
@@ -850,9 +780,7 @@ func (s *Server) resolve(ctx context.Context, request *model.Request) (response 
 
 		response, err = s.queryResolver.Resolve(ctx, request)
 		if err != nil {
-			var upstreamErr *resolver.UpstreamServerError
-
-			if errors.As(err, &upstreamErr) {
+			if upstreamErr, ok := errors.AsType[*resolver.UpstreamServerError](err); ok {
 				response = &model.Response{Res: upstreamErr.Msg, RType: model.ResponseTypeRESOLVED, Reason: upstreamErr.Error()}
 			} else {
 				return nil, fmt.Errorf("query resolution failed: %w", err)

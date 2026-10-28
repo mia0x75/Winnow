@@ -30,8 +30,8 @@ func NewHealthcheckCommand() *cobra.Command {
 		RunE: healthcheck,
 	}
 
-	c.Flags().Uint16P("port", "p", defaultDNSPort, "blocky port")
-	c.Flags().StringP("bindip", "b", defaultIPAddress, "blocky host binding ip address")
+	c.Flags().Uint16P("port", "p", defaultDNSPort, "denyzer port")
+	c.Flags().StringP("bindip", "b", defaultIPAddress, "denyzer host binding ip address")
 
 	return c
 }
@@ -53,7 +53,7 @@ func healthcheck(cmd *cobra.Command, args []string) error {
 	c := new(dns.Client)
 	c.Net = "tcp"
 	m := new(dns.Msg)
-	m.SetQuestion("healthcheck.blocky.", dns.TypeA)
+	m.SetQuestion("healthcheck.denyzer.", dns.TypeA)
 
 	addr := net.JoinHostPort(bindIP, strconv.FormatUint(uint64(port), 10))
 	_, _, err := c.Exchange(m, addr)

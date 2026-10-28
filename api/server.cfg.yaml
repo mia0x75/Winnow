@@ -4,3 +4,7 @@ generate:
   strict-server: true
   embedded-spec: false
 output: api_server.gen.go
+# Dashboard-only operations are documented (and served) but not code-generated.
+output-options:
+  exclude-tags:
+    - dashboard

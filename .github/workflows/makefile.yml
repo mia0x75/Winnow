@@ -39,6 +39,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        if: matrix.make == 'build'
+        with:
+          bun-version: "1.4.2"
+
       - name: Download dependencies
         run: go mod download
 
@@ -59,7 +65,7 @@ jobs:
 
       - name: Upload results to codecov
         uses: codecov/codecov-action@v7
-        if: matrix.make == 'test' && github.repository_owner == '0xERR0R'
+        if: matrix.make == 'test' && github.repository_owner == 'mia0x75'
 
       - name: Check GoReleaser configuration
         uses: goreleaser/goreleaser-action@v7

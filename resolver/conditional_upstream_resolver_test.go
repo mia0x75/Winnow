@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/log"
-	. "github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/log"
+	. "github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
@@ -210,7 +210,7 @@ var _ = Describe("ConditionalUpstreamResolver", Label("conditionalResolver"), fu
 
 			// Conditional upstreams should always succeed during construction to ensure
 			// they remain available even when default upstreams are unreachable.
-			// See: https://github.com/0xERR0R/blocky/issues/1639
+			// See: https://github.com/mia0x75/denyzer/issues/1639
 			r, err := NewConditionalUpstreamResolver(ctx, sutConfig, upstreamsCfg, b)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(r).ShouldNot(BeNil())

@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("DNS rebinding protection", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -32,7 +32,7 @@ var _ = Describe("DNS rebinding protection", func() {
 
 	When("rebinding protection is enabled with an allowlist", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -47,7 +47,7 @@ var _ = Describe("DNS rebinding protection", func() {
 
 		It("should resolve public answers normally", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("public.example.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(
 					SatisfyAll(
 						BeDNSRecord("public.example.com.", A, "1.2.3.4"),
@@ -59,7 +59,7 @@ var _ = Describe("DNS rebinding protection", func() {
 			msg := util.NewMsgWithQuestion("rebind.example.com.", A)
 
 			By("first query filtered", func() {
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 				Expect(resp.Answer).Should(BeEmpty())
@@ -67,7 +67,7 @@ var _ = Describe("DNS rebinding protection", func() {
 
 			// the cache-path proof (one upstream call, re-filtered per hit) lives in the unit spec "chained above a caching resolver"
 			By("repeat query still filtered", func() {
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 				Expect(resp.Answer).Should(BeEmpty())
@@ -76,7 +76,7 @@ var _ = Describe("DNS rebinding protection", func() {
 
 		It("should filter ULA IPv6 answers", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("rebind6.example.com.", AAAA)
-			resp, err := doDNSRequest(ctx, blocky, msg)
+			resp, err := doDNSRequest(ctx, denyzer, msg)
 			Expect(err).Should(Succeed())
 			Expect(resp.Rcode).Should(Equal(dns.RcodeSuccess))
 			Expect(resp.Answer).Should(BeEmpty())
@@ -84,14 +84,14 @@ var _ = Describe("DNS rebinding protection", func() {
 
 		It("should pass through allowlisted domains with private IPs", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("intranet.example.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(BeDNSRecord("intranet.example.com.", A, "192.168.1.50"))
 		})
 	})
 
 	When("rebinding protection is not configured", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -102,7 +102,7 @@ var _ = Describe("DNS rebinding protection", func() {
 
 		It("should pass through private answers (opt-in guard)", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("rebind.example.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(BeDNSRecord("rebind.example.com.", A, "192.168.1.100"))
 		})
 	})
@@ -113,7 +113,7 @@ var _ = Describe("DNS rebinding protection", func() {
 				`A router.home.lab/NOERROR("A 192.168.2.1 123")`)
 			Expect(err).Should(Succeed())
 
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				upstreams:
 				  groups:
 				    default:
@@ -133,14 +133,14 @@ var _ = Describe("DNS rebinding protection", func() {
 			msg := util.NewMsgWithQuestion("router.home.lab.", A)
 
 			By("first query", func() {
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("router.home.lab.", A, "192.168.2.1"))
 			})
 
 			// regression: conditional answers used to be cached and re-served as
 			// CACHED, where the protection filtered them from the 2nd query onward
 			By("repeat query", func() {
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("router.home.lab.", A, "192.168.2.1"))
 			})
 		})

@@ -58,6 +58,6 @@ dup.example.com
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com
 
-# --- leading/trailing hyphen labels (allowed by blocky's relaxed validation) ---
+# --- leading/trailing hyphen labels (allowed by denyzer's relaxed validation) ---
 -leading-hyphen.example.com
 trailing-hyphen-.example.com

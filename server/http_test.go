@@ -56,7 +56,7 @@ var _ = Describe("HTTP middleware", func() {
 
 		It("should allow Private Network Access preflights", func() {
 			// Chromium sends this header when a public site addresses a private IP,
-			// e.g. a hosted Grafana dashboard calling the blocky API on a LAN.
+			// e.g. a hosted Grafana dashboard calling the denyzer API on a LAN.
 			res := preflight(map[string]string{"Access-Control-Request-Private-Network": "true"})
 
 			Expect(res.Header.Get("Access-Control-Allow-Private-Network")).Should(Equal("true"))

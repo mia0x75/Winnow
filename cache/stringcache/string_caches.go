@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/trie"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/trie"
 )
 
 type stringCache interface {

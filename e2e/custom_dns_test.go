@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("Custom DNS tests", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -31,7 +31,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 		When("Simple mapping is configured", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -48,7 +48,7 @@ var _ = Describe("Custom DNS tests", func() {
 			It("Should resolve custom DNS entries", func(ctx context.Context) {
 				By("Resolving a custom A record", func() {
 					msg := util.NewMsgWithQuestion("printer.lan.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("printer.lan.", A, "192.168.178.3"),
@@ -59,7 +59,7 @@ var _ = Describe("Custom DNS tests", func() {
 				By("Resolving a custom entry with multiple IPs", func() {
 					// Test A record
 					msg := util.NewMsgWithQuestion("otherdevice.lan.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("otherdevice.lan.", A, "192.168.178.15"),
@@ -68,7 +68,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 					// Test AAAA record
 					msg = util.NewMsgWithQuestion("otherdevice.lan.", AAAA)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("otherdevice.lan.", AAAA, "2001:0db8:85a3:08d3:1319:8a2e:0370:7344"),
@@ -78,7 +78,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 				By("Resolving subdomains of custom entries", func() {
 					msg := util.NewMsgWithQuestion("my.printer.lan.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("my.printer.lan.", A, "192.168.178.3"),
@@ -88,7 +88,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 				By("Falling back to upstream for non-custom domains", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "1.2.3.4"),
@@ -100,7 +100,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 		When("Domain rewriting is configured", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -120,7 +120,7 @@ var _ = Describe("Custom DNS tests", func() {
 			It("Should rewrite domains according to configuration", func(ctx context.Context) {
 				By("Rewriting 'home' to 'lan'", func() {
 					msg := util.NewMsgWithQuestion("printer.home.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("printer.home.", A, "192.168.178.3"),
@@ -130,7 +130,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 				By("Rewriting 'replace-me.com' to 'with-this.com'", func() {
 					msg := util.NewMsgWithQuestion("a.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("a.example.com.", A, "1.2.3.4"),
@@ -145,7 +145,7 @@ var _ = Describe("Custom DNS tests", func() {
 				Expect(err).Should(Succeed())
 
 				// Create a container with the zone file
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -163,7 +163,7 @@ var _ = Describe("Custom DNS tests", func() {
 			It("Should resolve records from zone file", func(ctx context.Context) {
 				By("Resolving A record from zone", func() {
 					msg := util.NewMsgWithQuestion("www.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("www.example.com.", A, "1.2.3.5"),
@@ -173,7 +173,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 				By("Resolving CNAME record from zone", func() {
 					msg := util.NewMsgWithQuestion("example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("example.com.", CNAME, "www.example.com."),
@@ -190,7 +190,7 @@ var _ = Describe("Custom DNS tests", func() {
 					`AAAA printer.lan/NOERROR("AAAA 2001:db8::1 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -209,7 +209,7 @@ var _ = Describe("Custom DNS tests", func() {
 			It("Should forward unmapped types to upstream", func(ctx context.Context) {
 				By("Resolving defined A record locally", func() {
 					msg := util.NewMsgWithQuestion("printer.lan.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("printer.lan.", A, "192.168.178.3"),
@@ -221,7 +221,7 @@ var _ = Describe("Custom DNS tests", func() {
 					// This should be forwarded to upstream since we only defined A record
 					// and filterUnmappedTypes is false
 					msg := util.NewMsgWithQuestion("printer.lan.", AAAA)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("printer.lan.", AAAA, "2001:db8::1"),
@@ -237,7 +237,7 @@ var _ = Describe("Custom DNS tests", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka2", e2eNet,
 					`AAAA printer.lan/NOERROR("AAAA 2001:db8::1 123")`)
 				Expect(err).Should(Succeed())
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -255,7 +255,7 @@ var _ = Describe("Custom DNS tests", func() {
 			It("Should filter unmapped types", func(ctx context.Context) {
 				By("Resolving defined A record locally", func() {
 					msg := util.NewMsgWithQuestion("printer.lan.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("printer.lan.", A, "192.168.178.3"),
@@ -267,7 +267,7 @@ var _ = Describe("Custom DNS tests", func() {
 					// This should return empty since we only defined A record
 					// and filterUnmappedTypes is true (default)
 					msg := util.NewMsgWithQuestion("printer.lan.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Answer).Should(BeEmpty())
 				})
@@ -276,7 +276,7 @@ var _ = Describe("Custom DNS tests", func() {
 
 		When("Reverse DNS lookup is performed", func() {
 			BeforeEach(func(ctx context.Context) {
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -297,7 +297,7 @@ var _ = Describe("Custom DNS tests", func() {
 					Expect(err).Should(Succeed())
 
 					msg := util.NewMsgWithQuestion(ptrName, PTR)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord(ptrName, PTR, "printer.lan."),
@@ -311,7 +311,7 @@ var _ = Describe("Custom DNS tests", func() {
 					Expect(err).Should(Succeed())
 
 					msg := util.NewMsgWithQuestion(ptrName, PTR)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord(ptrName, PTR, "multi.lan."),
@@ -325,7 +325,7 @@ var _ = Describe("Custom DNS tests", func() {
 					Expect(err).Should(Succeed())
 
 					msg := util.NewMsgWithQuestion(ptrName, PTR)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Answer).Should(BeEmpty())
 				})

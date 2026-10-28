@@ -417,7 +417,7 @@ func stampBootstrapIPs(serverIP string, bootstrapIPs []string) []net.IP {
 	return ips
 }
 
-// stampProtoToNetProtocol maps DNS stamp protocol to Blocky's NetProtocol
+// stampProtoToNetProtocol maps DNS stamp protocol to Denyzer's NetProtocol
 func stampProtoToNetProtocol(proto dnsstamps.StampProtoType) (NetProtocol, error) {
 	switch proto {
 	case dnsstamps.StampProtoTypePlain:

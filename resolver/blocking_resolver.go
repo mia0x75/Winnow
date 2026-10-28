@@ -15,22 +15,25 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/0xERR0R/blocky/api"
-	"github.com/0xERR0R/blocky/cache"
-	expirationcache "github.com/0xERR0R/expiration-cache"
+	"github.com/mia0x75/denyzer/api"
+	"github.com/mia0x75/denyzer/cache"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/lists"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/lists"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 )
 
 const defaultBlockingCleanUpInterval = 5 * time.Second
+
+// defaultCacheSize caps the in-memory resolver caches, mirroring the entry
+// capacity of the legacy expiration-cache they replaced.
+const defaultCacheSize = 10000
 
 func createBlockHandler(cfg config.Blocking) (blockHandler, error) {
 	cfgBlockType := cfg.BlockType
@@ -263,12 +266,14 @@ func NewBlockingResolver(ctx context.Context,
 		clientGroups: newClientGroupsIndex(cfg),
 	}
 
-	res.fqdnIPCache = expirationcache.NewCacheWithOnExpired[[]net.IP](ctx, expirationcache.Options{
+	fqdnIPCache := cache.NewCacheWithOnExpired[[]net.IP](cache.Options{
 		CleanupInterval: defaultBlockingCleanUpInterval,
-		Shards:          cache.ShardCount(),
+		MaxSize:         defaultCacheSize,
 	}, func(ctx context.Context, key string) (val *[]net.IP, ttl time.Duration) {
 		return res.queryForFQIdentifierIPs(ctx, key)
 	})
+	fqdnIPCache.Start(ctx)
+	res.fqdnIPCache = fqdnIPCache
 
 	if err := res.subscribeEvents(ctx); err != nil {
 		return nil, err
@@ -439,6 +444,20 @@ func (r *BlockingResolver) BlockingStatus() api.BlockingStatus {
 		DisabledGroups:  slices.Clone(r.status.disabledGroups),
 		AutoEnableInSec: int(autoEnableDuration.Seconds()),
 	}
+}
+
+// ListCounts returns the current per-group entry counts of the denylist and
+// allowlist caches.
+func (r *BlockingResolver) ListCounts() (denylist, allowlist map[string]int) {
+	if r.denylistMatcher != nil {
+		denylist = r.denylistMatcher.Counts()
+	}
+
+	if r.allowlistMatcher != nil {
+		allowlist = r.allowlistMatcher.Counts()
+	}
+
+	return denylist, allowlist
 }
 
 // returns groups, which have only allowlist entries
@@ -724,7 +743,7 @@ func formatBlockReason(matches map[string]string, typeName string) string {
 
 // formatBlockReasonLabel renders a low-cardinality block reason of the form
 // "BLOCKED[ TYPE] (group[, group...])" — group names only, without the matched
-// rule. It is used as the `reason` Prometheus metric label so the label stays
+// rule. It is used as the `reason` label in statistics so the label stays
 // bounded by the number of configured groups, regardless of deny-list size.
 func formatBlockReasonLabel(matches map[string]string, typeName string) string {
 	return renderBlockReason(matches, typeName, false)

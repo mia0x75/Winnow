@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/0xERR0R/blocky/helpertest"
+	"github.com/mia0x75/denyzer/helpertest"
 	"github.com/miekg/dns"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -62,7 +62,7 @@ func createMockServer(hostPort string) *dns.Server {
 	}
 
 	th := res.Handler.(*dns.ServeMux)
-	th.HandleFunc("healthcheck.blocky", func(w dns.ResponseWriter, request *dns.Msg) {
+	th.HandleFunc("healthcheck.denyzer", func(w dns.ResponseWriter, request *dns.Msg) {
 		resp := new(dns.Msg)
 		resp.SetReply(request)
 		resp.Rcode = dns.RcodeSuccess

@@ -4,12 +4,12 @@ import (
 	"context"
 	"net"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/creasty/defaults"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/util"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	. "github.com/0xERR0R/blocky/model"
+	. "github.com/mia0x75/denyzer/helpertest"
+	. "github.com/mia0x75/denyzer/model"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
@@ -104,7 +104,7 @@ var _ = Describe("ECSClientResolver", func() {
 	})
 })
 
-// Regression test for https://github.com/0xERR0R/blocky/issues/2140
+// Regression test for https://github.com/mia0x75/denyzer/issues/2140
 //
 // With ecs.useAsClient, the EDNS Client Subnet address must be adopted as the internal
 // client IP *before* the client-name lookup and the cache, so that:
@@ -135,7 +135,7 @@ var _ = Describe("ECS as client across the resolver chain (issue #2140)", func()
 		var cachingCfg config.Caching
 		Expect(defaults.Set(&cachingCfg)).Should(Succeed())
 
-		caching, err := NewCachingResolver(ctx, cachingCfg, config.DNSSEC{}, nil)
+		caching, err := NewCachingResolver(ctx, cachingCfg, config.DNSSEC{})
 		Expect(err).Should(Succeed())
 		caching.Next(upstream)
 

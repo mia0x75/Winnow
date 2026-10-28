@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
 	"github.com/avast/retry-go/v4"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
 )
 
 // cacheDirPermission is used when creating the on-disk download cache directory.

@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xERR0R/blocky/cache/stringcache"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/querylog"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/avast/retry-go/v4"
+	"github.com/mia0x75/denyzer/cache/stringcache"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/querylog"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 )
@@ -24,7 +24,6 @@ import (
 const (
 	cleanUpRunPeriod         = 12 * time.Hour
 	queryLoggingResolverType = "query_logging"
-	logChanCap               = 1000
 	defaultClientIP          = "0.0.0.0"
 	queryLogIgnoreGroup      = "ignore"
 )
@@ -39,7 +38,6 @@ type QueryLoggingResolver struct {
 	NextResolver
 	typed
 
-	logChan       chan *querylog.LogEntry
 	writer        querylog.Writer
 	instanceID    string
 	ignoreDomains stringcache.GroupedStringCache
@@ -51,21 +49,13 @@ func GetQueryLoggingWriter(ctx context.Context, cfg config.QueryLog, instanceID 
 	var err error
 
 	switch cfg.Type {
-	case config.QueryLogTypeCsv:
-		writer, err = querylog.NewCSVWriter(cfg.Target.Reveal(), false, cfg.LogRetentionDays)
-	case config.QueryLogTypeCsvClient:
-		writer, err = querylog.NewCSVWriter(cfg.Target.Reveal(), true, cfg.LogRetentionDays)
-	case config.QueryLogTypeMysql, config.QueryLogTypePostgresql, config.QueryLogTypeTimescale, config.QueryLogTypeSqlite:
-		// The database-backed targets share one writer; it selects the driver and
-		// migration from the typed QueryLogType, so no per-type string is threaded through.
-		writer, err = querylog.NewDatabaseWriter(ctx, cfg.Type, cfg.Target.Reveal(), cfg.LogRetentionDays,
-			cfg.FlushInterval.ToDuration())
+	case config.QueryLogTypeSqlite:
+		writer, err = querylog.NewAsyncLogWriter(ctx, cfg.Target.Reveal(), cfg.Retention,
+			cfg.FlushInterval.ToDuration(), cfg.BatchSize)
 	case config.QueryLogTypeConsole:
 		writer = querylog.NewLoggerWriter()
 	case config.QueryLogTypeNone:
 		writer = querylog.NewNoneWriter()
-	case config.QueryLogTypeDnstap:
-		writer, err = querylog.NewDnstapWriter(cfg.Target.Reveal(), cfg.FlushInterval.ToDuration(), instanceID)
 	}
 
 	if err != nil {
@@ -131,6 +121,15 @@ func NewQueryLoggingResolver(ctx context.Context, cfg config.QueryLog) (*QueryLo
 		return nil, fmt.Errorf("failed to determine instance ID for query logging: %w", err)
 	}
 
+	// queryLog.type defaults to sqlite, so an empty target means query logging
+	// was not configured at all. Keep the console behaviour instead of retrying
+	// against a database that has no path.
+	if cfg.Type == config.QueryLogTypeSqlite && cfg.Target == "" {
+		logger.Debug("no queryLog.target configured, logging to console")
+
+		cfg.Type = config.QueryLogTypeConsole
+	}
+
 	err = retry.Do(
 		func() error {
 			var err error
@@ -154,26 +153,20 @@ func NewQueryLoggingResolver(ctx context.Context, cfg config.QueryLog) (*QueryLo
 		cfg.Type = config.QueryLogTypeConsole
 	}
 
-	logChan := make(chan *querylog.LogEntry, logChanCap)
-
 	ignoreDomains := newIgnoreDomainsMatcher(cfg.Ignore.Domains, logger)
 
 	resolver := QueryLoggingResolver{
 		configurable: withConfig(&cfg),
 		typed:        withType(queryLoggingResolverType),
 
-		logChan:       logChan,
 		writer:        writer,
 		instanceID:    instanceID,
 		ignoreDomains: ignoreDomains,
 	}
 
-	go resolver.writeLog(ctx)
-
-	// Timescale uses database features for retention
-	if cfg.LogRetentionDays > 0 &&
-		cfg.Type != config.QueryLogTypeTimescale &&
-		cfg.Type != config.QueryLogTypeDnstap {
+	// TTL cleanup is handled by AsyncLogWriter internally, but for non-sqlite
+	// writers we still need a periodic cleanup goroutine.
+	if cfg.Type != config.QueryLogTypeSqlite {
 		go resolver.periodicCleanUp(ctx)
 	}
 
@@ -190,6 +183,8 @@ func (r *QueryLoggingResolver) periodicCleanUp(ctx context.Context) {
 		case <-ticker.C:
 			r.doCleanUp()
 		case <-ctx.Done():
+			r.closeWriter()
+
 			return
 		}
 	}
@@ -214,6 +209,8 @@ func (r *QueryLoggingResolver) Resolve(ctx context.Context, request *model.Reque
 	duration := time.Since(start).Milliseconds()
 
 	if err != nil {
+		r.writer.RecordError()
+
 		return nil, err
 	}
 
@@ -234,11 +231,7 @@ func (r *QueryLoggingResolver) Resolve(ctx context.Context, request *model.Reque
 		return resp, nil
 	}
 
-	select {
-	case r.logChan <- entry:
-	default:
-		logger.Error("query log writer is too slow, log entry will be dropped")
-	}
+	r.writer.Write(entry)
 
 	return resp, nil
 }
@@ -267,10 +260,10 @@ func (r *QueryLoggingResolver) createLogEntry(request *model.Request, response *
 	start time.Time, durationMs int64,
 ) *querylog.LogEntry {
 	entry := querylog.LogEntry{
-		Start:          start,
-		ClientIP:       defaultClientIP,
-		ClientNames:    []string{"none"},
-		BlockyInstance: r.instanceID,
+		Start:           start,
+		ClientIP:        defaultClientIP,
+		ClientNames:     []string{"none"},
+		DenyzerInstance: r.instanceID,
 	}
 
 	for _, f := range r.cfg.Fields {
@@ -298,54 +291,7 @@ func (r *QueryLoggingResolver) createLogEntry(request *model.Request, response *
 		}
 	}
 
-	if r.cfg.Type == config.QueryLogTypeDnstap {
-		var err error
-		entry.QueryWire, err = request.Req.Pack()
-		if err != nil {
-			log.PrefixedLog(queryLoggingResolverType).WithError(err).Warn("failed to pack query wire for dnstap")
-
-			return nil
-		}
-		entry.ResponseWire, err = response.Res.Pack()
-		if err != nil {
-			log.PrefixedLog(queryLoggingResolverType).WithError(err).Warn("failed to pack response wire for dnstap")
-
-			return nil
-		}
-		entry.QueryTime = request.RequestTS
-		entry.ResponseTime = start.Add(time.Duration(durationMs) * time.Millisecond)
-		entry.SocketProtocol = request.Protocol
-		entry.ClientIP = request.ClientIP.String()
-	}
-
 	return &entry
-}
-
-// write entry: if log directory is configured, write to log file
-func (r *QueryLoggingResolver) writeLog(ctx context.Context) {
-	ctx, logger := r.log(ctx)
-
-	for {
-		select {
-		case logEntry := <-r.logChan:
-			start := time.Now()
-
-			r.writer.Write(logEntry)
-
-			halfCap := cap(r.logChan) / 2
-
-			// if log channel is > 50% full, this could be a problem with slow writer (external storage over network etc.)
-			if len(r.logChan) > halfCap {
-				logger.
-					WithField("channel_len", len(r.logChan)).
-					Warnf("query log writer is too slow, write duration: %d ms", time.Since(start).Milliseconds())
-			}
-		case <-ctx.Done():
-			r.closeWriter()
-
-			return
-		}
-	}
 }
 
 // closeWriter lets writers that hold external resources (e.g. the dnstap socket)
@@ -361,7 +307,7 @@ func (r *QueryLoggingResolver) closeWriter() {
 
 func readInstanceID(file string) (string, error) {
 	// Prefer /etc/hostname over os.Hostname to allow easy differentiation in a Docker Swarm
-	// See details in https://github.com/0xERR0R/blocky/pull/756
+	// See details in https://github.com/mia0x75/denyzer/pull/756
 	hn, fErr := os.ReadFile(file)
 	if fErr == nil {
 		return strings.TrimSpace(string(hn)), nil

@@ -1,5 +1,5 @@
 {
-  "name": "blocky development",
+  "name": "denyzer development",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
   "features": {
     "ghcr.io/devcontainers/features/go:1": {},
@@ -62,7 +62,7 @@
   "mounts": [
     "type=bind,readonly,source=/etc/localtime,target=/usr/share/host/localtime",
     "type=bind,readonly,source=/etc/timezone,target=/usr/share/host/timezone",
-    "type=volume,source=blocky-pkg_cache,target=/go/pkg"
+    "type=volume,source=denyzer-pkg_cache,target=/go/pkg"
   ],
   "postCreateCommand": "sudo chmod +x .devcontainer/scripts/*.sh",
   "postStartCommand": "sh .devcontainer/scripts/postStart.sh"

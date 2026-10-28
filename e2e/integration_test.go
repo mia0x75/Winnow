@@ -2,12 +2,11 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,9 +15,9 @@ import (
 
 var _ = Describe("Integration tests", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -52,18 +51,17 @@ var _ = Describe("Integration tests", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				// Create blocky with a comprehensive configuration
+				// Create denyzer with a comprehensive configuration
 				// This tests the full resolver chain with:
 				// - Blocking (with allowlist and denylist)
 				// - Custom DNS mappings
 				// - Conditional upstream forwarding
 				// - Caching
 				// - Query logging (console)
-				// - Prometheus metrics
 				// - Client groups
 				// - Special use domain names handling
 				// - Filtering
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: info
 					upstreams:
@@ -98,8 +96,6 @@ var _ = Describe("Integration tests", func() {
 					caching:
 					  minTime: 5s
 					  maxTime: 30m
-					  prefetching: true
-					  prefetchThreshold: 5
 					# Query logging to console
 					queryLog:
 					  type: console
@@ -110,10 +106,6 @@ var _ = Describe("Integration tests", func() {
 					    - responseAnswer
 					    - question
 					    - duration
-					# Prometheus metrics
-					prometheus:
-					  enable: true
-					  path: /metrics
 					# Special use domain names
 					specialUseDomains:
 					  rfc6762-appendixG: true
@@ -129,7 +121,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 1: Custom DNS mapping
 				By("resolving custom DNS mapping for 'custom.local'", func() {
 					msg := util.NewMsgWithQuestion("custom.local.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("custom.local.", A, "10.0.0.1"),
@@ -140,7 +132,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 2: Custom DNS with multiple IPs
 				By("resolving custom DNS with multiple IPs for 'internal.example.com'", func() {
 					msg := util.NewMsgWithQuestion("internal.example.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Answer).Should(HaveLen(2))
 
@@ -156,7 +148,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 3: Conditional upstream forwarding
 				By("forwarding .local domains to conditional upstream", func() {
 					msg := util.NewMsgWithQuestion("server.local.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("server.local.", A, "192.168.1.100"),
@@ -164,7 +156,7 @@ var _ = Describe("Integration tests", func() {
 							))
 
 					msg = util.NewMsgWithQuestion("nas.local.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("nas.local.", A, "192.168.1.50"),
@@ -175,13 +167,13 @@ var _ = Describe("Integration tests", func() {
 				// Test 4: Blocking resolver with denylist
 				By("blocking domains from denylist", func() {
 					msg := util.NewMsgWithQuestion("ads.example.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 					Expect(resp.Answer).Should(BeEmpty())
 
 					msg = util.NewMsgWithQuestion("tracker.analytics.com.", A)
-					resp, err = doDNSRequest(ctx, blocky, msg)
+					resp, err = doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 				})
@@ -189,7 +181,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 5: Blocking with wildcard patterns
 				By("blocking domains matching wildcard patterns", func() {
 					msg := util.NewMsgWithQuestion("subdomain.malware.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 				})
@@ -198,7 +190,7 @@ var _ = Describe("Integration tests", func() {
 				By("allowing domains in allowlist even if partially blocked", func() {
 					// example.com is in allowlist, so it should not be blocked
 					msg := util.NewMsgWithQuestion("example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("example.com.", A, "93.184.216.34"),
@@ -209,7 +201,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 7: Default upstream resolution
 				By("resolving domains via default upstream", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "8.8.8.8"),
@@ -222,12 +214,12 @@ var _ = Describe("Integration tests", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
 
 					// First query - should hit upstream
-					resp1, err := doDNSRequest(ctx, blocky, msg)
+					resp1, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					ttl1 := resp1.Answer[0].Header().Ttl
 
 					// Second query - should hit cache with decreased TTL
-					resp2, err := doDNSRequest(ctx, blocky, msg)
+					resp2, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					ttl2 := resp2.Answer[0].Header().Ttl
 
@@ -238,7 +230,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 9: Query type filtering (AAAA)
 				By("filtering AAAA queries", func() {
 					msg := util.NewMsgWithQuestion("google.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					// Should return empty response or NXDOMAIN for filtered types
 					Expect(resp.Answer).Should(BeEmpty())
@@ -249,44 +241,15 @@ var _ = Describe("Integration tests", func() {
 				// but we can test other special domains
 				By("blocking special use domains per RFC6762", func() {
 					msg := util.NewMsgWithQuestion("test.invalid.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					// Should be blocked by SUDN resolver
 					Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
 				})
 
-				// Test 11: Prometheus metrics exposure
-				By("exposing Prometheus metrics", func() {
-					host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
-					Expect(err).Should(Succeed())
-					url := "http://" + net.JoinHostPort(host, port) + "/metrics"
-
-					Eventually(func() error {
-						resp, err := http.Get(url)
-						if err != nil {
-							return err
-						}
-						defer resp.Body.Close()
-
-						if resp.StatusCode != http.StatusOK {
-							return fmt.Errorf("expected 200, got %d", resp.StatusCode)
-						}
-
-						return nil
-					}, "5s", "500ms").Should(Succeed())
-
-					// Verify metrics contain expected data
-					Eventually(http.Get).WithArguments(url).Should(
-						HaveHTTPBody(And(
-							ContainSubstring("blocky_"),
-							ContainSubstring("query_total"),
-						)),
-					)
-				})
-
-				// Test 12: API endpoints functionality
+				// Test 11: API endpoints functionality
 				By("serving API endpoints for blocking control", func() {
-					host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+					host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 					Expect(err).Should(Succeed())
 					baseURL := "http://" + net.JoinHostPort(host, port)
 
@@ -302,7 +265,7 @@ var _ = Describe("Integration tests", func() {
 
 					// Verify blocked domain now resolves (blocking disabled)
 					msg := util.NewMsgWithQuestion("tracker.analytics.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("tracker.analytics.com.", A, "1.2.3.4"),
@@ -317,7 +280,7 @@ var _ = Describe("Integration tests", func() {
 
 					// Verify domain is blocked again
 					msg = util.NewMsgWithQuestion("tracker.analytics.com.", A)
-					respDNS, err := doDNSRequest(ctx, blocky, msg)
+					respDNS, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(respDNS.Rcode).Should(Equal(dns.RcodeNameError))
 				})
@@ -325,7 +288,7 @@ var _ = Describe("Integration tests", func() {
 				// Test 13: Container health check
 				By("reporting healthy status", func() {
 					Eventually(func(g Gomega) string {
-						state, err := blocky.State(ctx)
+						state, err := denyzer.State(ctx)
 						g.Expect(err).NotTo(HaveOccurred())
 
 						return string(state.Health.Status)
@@ -336,12 +299,12 @@ var _ = Describe("Integration tests", func() {
 				By("logging queries to console", func() {
 					// Make a query to ensure it gets logged
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					_, err := doDNSRequest(ctx, blocky, msg)
+					_, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Check logs contain query information
 					Eventually(func() []string {
-						logs, _ := getContainerLogs(ctx, blocky)
+						logs, _ := getContainerLogs(ctx, denyzer)
 
 						return logs
 					}, "5s", "500ms").Should(
@@ -360,7 +323,7 @@ var _ = Describe("Integration tests", func() {
 					// Even though internal.example.com matches no conditional,
 					// custom DNS should handle it first
 					msg := util.NewMsgWithQuestion("internal.example.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 
 					// Should get custom DNS response, not upstream
@@ -379,12 +342,12 @@ var _ = Describe("Integration tests", func() {
 					msg := util.NewMsgWithQuestion("ads.example.com.", A)
 
 					// First query - should be blocked
-					resp1, err := doDNSRequest(ctx, blocky, msg)
+					resp1, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp1.Rcode).Should(Equal(dns.RcodeNameError))
 
 					// Second query - should still be blocked (from cache)
-					resp2, err := doDNSRequest(ctx, blocky, msg)
+					resp2, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp2.Rcode).Should(Equal(dns.RcodeNameError))
 				})
@@ -392,7 +355,7 @@ var _ = Describe("Integration tests", func() {
 				// Conditional should take precedence over default upstream
 				By("using conditional upstream before default upstream", func() {
 					msg := util.NewMsgWithQuestion("server.local.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("server.local.", A, "192.168.1.100"),
@@ -405,7 +368,7 @@ var _ = Describe("Integration tests", func() {
 				// Test NXDOMAIN handling
 				By("handling NXDOMAIN responses correctly", func() {
 					msg := util.NewMsgWithQuestion("nonexistent.example.com.", A)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					// Should propagate NXDOMAIN from upstream
 					Expect(resp.Rcode).Should(Or(
@@ -417,7 +380,7 @@ var _ = Describe("Integration tests", func() {
 				// Test case sensitivity
 				By("handling case-insensitive domain matching", func() {
 					msg := util.NewMsgWithQuestion("CUSTOM.LOCAL.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("CUSTOM.LOCAL.", A, "10.0.0.1"),
@@ -429,13 +392,13 @@ var _ = Describe("Integration tests", func() {
 				By("handling different DNS query types", func() {
 					// A record
 					msgA := util.NewMsgWithQuestion("google.com.", A)
-					respA, err := doDNSRequest(ctx, blocky, msgA)
+					respA, err := doDNSRequest(ctx, denyzer, msgA)
 					Expect(err).Should(Succeed())
 					Expect(respA.Answer).ShouldNot(BeEmpty())
 
 					// AAAA record (should be filtered)
 					msgAAAA := util.NewMsgWithQuestion("google.com.", AAAA)
-					respAAAA, err := doDNSRequest(ctx, blocky, msgAAAA)
+					respAAAA, err := doDNSRequest(ctx, denyzer, msgAAAA)
 					Expect(err).Should(Succeed())
 					Expect(respAAAA.Answer).Should(BeEmpty())
 				})

@@ -81,7 +81,7 @@ var _ = Describe("Collector", func() {
 
 			Expect(res.Summary.Blocked).Should(Equal(1)) // BLOCKED only
 			Expect(res.Summary.Errors).Should(Equal(2))  // chain error + BOGUS
-			// a domain with broken signatures is not something blocky blocked
+			// a domain with broken signatures is not something denyzer blocked
 			Expect(namesOf(res.TopBlockedDomains)).ShouldNot(ContainElement("bogus.example.com"))
 			// still a query that reached an answer, so it counts in the total
 			Expect(res.Summary.Queries).Should(Equal(3))
@@ -126,7 +126,7 @@ var _ = Describe("Collector", func() {
 	})
 
 	Describe("windowing", func() {
-		It("evicts buckets older than 24h", func() {
+		It("evicts buckets older than 24h but keeps the all-time summary", func() {
 			clk := &fakeClock{t: mustParse("2026-06-08T00:30:00Z")}
 			c := newCollectorWithClock(clk.now)
 
@@ -136,11 +136,32 @@ var _ = Describe("Collector", func() {
 			c.Record(Sample{Disposition: DispositionAnswered, RType: "RESOLVED", QType: "A", Domain: "new.com"})
 
 			res := c.Snapshot()
-			Expect(res.Summary.Queries).Should(Equal(1))
+			// The window only sees the newer sample ...
 			Expect(res.ByResponseType).Should(HaveKeyWithValue("RESOLVED", 1))
 			names := namesOf(res.TopDomains)
 			Expect(names).Should(ContainElement("new.com"))
 			Expect(names).ShouldNot(ContainElement("old.com"))
+			// ... but the summary is all-time cumulative and never shrinks.
+			Expect(res.Summary.Queries).Should(Equal(2))
+		})
+
+		It("keeps the summary monotonic across window evictions", func() {
+			clk := &fakeClock{t: mustParse("2026-06-08T00:30:00Z")}
+			c := newCollectorWithClock(clk.now)
+
+			c.Record(Sample{Disposition: DispositionAnswered, RType: "CACHED", QType: "A", Domain: "a.com"})
+
+			first := c.Snapshot().Summary
+			Expect(first.Queries).Should(Equal(1))
+
+			clk.t = mustParse("2026-06-09T01:30:00Z") // > 24h later, old bucket evicted
+			c.Record(Sample{Disposition: DispositionAnswered, RType: "BLOCKED", QType: "A", Domain: "ads.com"})
+
+			second := c.Snapshot().Summary
+			Expect(second.Queries).Should(Equal(2))
+			Expect(second.Blocked).Should(Equal(1))
+			Expect(first.Queries).Should(BeNumerically(">=", 1))
+			Expect(second.Queries).Should(BeNumerically(">=", first.Queries))
 		})
 
 		It("builds a per-hour series across buckets", func() {

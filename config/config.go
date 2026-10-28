@@ -18,11 +18,11 @@ import (
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 
-	. "github.com/0xERR0R/blocky/config/migration"
-	"github.com/0xERR0R/blocky/config/schema"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/creasty/defaults"
+	. "github.com/mia0x75/denyzer/config/migration"
+	"github.com/mia0x75/denyzer/config/schema"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -97,22 +97,16 @@ func (v *TLSVersion) validate(logger *logrus.Entry) {
 }
 
 // QueryLogType type of the query log ENUM(
-// console // Log to console output (used when no type is set).
+// sqlite // Log each query to a local SQLite database file (default).
+// console // Log to console output; the dashboard has no data.
 // none // Do not log any queries.
-// mysql // Log each query to an external MySQL or MariaDB database.
-// postgresql // Log each query to an external PostgreSQL database.
-// csv // Log to a CSV file (one per day).
-// csv-client // Log to a CSV file (one per day and per client).
-// timescale // Log each query to an external Timescale database.
-// sqlite // Log each query to a local SQLite database file.
-// dnstap // Export query/response events via dnstap (Frame Streams).
 // )
 type QueryLogType int16
 
 // InitStrategy startup strategy ENUM(
-// blocking // Initialization runs before DNS resolution starts; errors are logged but Blocky keeps running if possible.
-// failOnError // Like blocking but Blocky exits with an error if initialization fails.
-// fast // Blocky serves DNS immediately and runs initialization in the background.
+// blocking // Initialization runs before DNS resolution starts; errors are logged but Denyzer keeps running.
+// failOnError // Like blocking but Denyzer exits with an error if initialization fails.
+// fast // Denyzer serves DNS immediately and runs initialization in the background.
 // )
 type InitStrategy uint16
 
@@ -280,12 +274,8 @@ type Config struct {
 	Caching Caching `yaml:"caching"`
 	// Query logging configuration.
 	QueryLog QueryLog `yaml:"queryLog"`
-	// Prometheus metrics configuration.
-	Prometheus Metrics `yaml:"prometheus"`
 	// In-memory statistics subsystem (24h window), served at /api/stats.
 	Statistics Statistics `yaml:"statistics"`
-	// Redis configuration for cache and state synchronization between instances.
-	Redis Redis `yaml:"redis"`
 	// Logging configuration.
 	Log log.Config `yaml:"log"`
 	// Listen addresses for DNS, HTTP, HTTPS, and TLS.
@@ -300,7 +290,7 @@ type Config struct {
 	BootstrapDNS BootstrapDNS `yaml:"bootstrapDns"`
 	// Local hosts file resolution settings.
 	HostsFile HostsFile `yaml:"hostsFile"`
-	// When enabled, blocky returns NXDOMAIN immediately for non-FQDN queries.
+	// When enabled, denyzer returns NXDOMAIN immediately for non-FQDN queries.
 	FQDNOnly FQDNOnly `yaml:"fqdnOnly"`
 	// DNS query type filtering configuration.
 	Filtering Filtering `yaml:"filtering"`
@@ -622,9 +612,9 @@ type Downloader struct {
 	Cooldown Duration `default:"500ms" yaml:"cooldown"`
 	// Directory for the on-disk download cache. When empty (default), downloads are
 	// fully stateless: nothing is written to disk and every source is downloaded in
-	// full on every refresh. When set, blocky uses HTTP conditional requests and
+	// full on every refresh. When set, denyzer uses HTTP conditional requests and
 	// serves unchanged/unavailable sources from this directory. Must be writable by
-	// the user blocky runs as (UID 100 in the container image), otherwise caching is
+	// the user denyzer runs as (UID 100 in the container image), otherwise caching is
 	// silently skipped and downloads stay stateless.
 	CachePath string `yaml:"cachePath"`
 }
@@ -834,7 +824,7 @@ func unmarshalConfig(logger *logrus.Entry, data []byte, cfg *Config, sources []c
 	if err != nil {
 		// Enrich the already-failing path with field-path schema errors,
 		// keeping the underlying yaml error for detail. This never rejects a
-		// config blocky would accept: we only reach here because
+		// config denyzer would accept: we only reach here because
 		// UnmarshalStrict already failed.
 		// In folder mode the yaml error's line numbers refer to the merged
 		// document, not any source file; the reconciled findings below carry

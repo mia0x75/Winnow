@@ -7,9 +7,9 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/0xERR0R/blocky/api"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/api"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
@@ -17,9 +17,9 @@ import (
 
 var _ = Describe("Statistics functional tests", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -36,7 +36,7 @@ var _ = Describe("Statistics functional tests", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver1", e2eNet, "list1.txt", "ads.example.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -59,19 +59,19 @@ var _ = Describe("Statistics functional tests", func() {
 			})
 
 			It("aggregates queries and serves them as JSON", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				statsURL := "http://" + net.JoinHostPort(host, port) + "/api/stats"
 
 				By("driving three distinct query outcomes", func() {
 					// 1. forwarded (resolved upstream)
-					Expect(doDNSRequest(ctx, blocky, util.NewMsgWithQuestion("google.com.", A))).
+					Expect(doDNSRequest(ctx, denyzer, util.NewMsgWithQuestion("google.com.", A))).
 						Should(BeDNSRecord("google.com.", A, "1.2.3.4"))
 					// 2. cached (same query again)
-					Expect(doDNSRequest(ctx, blocky, util.NewMsgWithQuestion("google.com.", A))).
+					Expect(doDNSRequest(ctx, denyzer, util.NewMsgWithQuestion("google.com.", A))).
 						Should(BeDNSRecord("google.com.", A, "1.2.3.4"))
 					// 3. blocked (denylisted domain)
-					_, err := doDNSRequest(ctx, blocky, util.NewMsgWithQuestion("ads.example.com.", A))
+					_, err := doDNSRequest(ctx, denyzer, util.NewMsgWithQuestion("ads.example.com.", A))
 					Expect(err).Should(Succeed())
 				})
 
@@ -98,7 +98,7 @@ var _ = Describe("Statistics functional tests", func() {
 					`A google.com/NOERROR("A 1.2.3.4 300")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -110,7 +110,7 @@ var _ = Describe("Statistics functional tests", func() {
 			})
 
 			It("returns 503 from /api/stats", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet,

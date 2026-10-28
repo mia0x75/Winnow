@@ -30,7 +30,7 @@ func TLSGenerateSelfSignedCert(domains []string) (tls.Certificate, error) {
 	template := &x509.Certificate{
 		SerialNumber: serial,
 
-		Subject:  pkix.Name{Organization: []string{"Blocky"}},
+		Subject:  pkix.Name{Organization: []string{"Denyzer"}},
 		DNSNames: domains,
 
 		NotBefore: time.Now(),

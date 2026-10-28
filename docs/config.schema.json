@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/0xERR0R/blocky/config/config",
+  "$id": "https://github.com/mia0x75/denyzer/config/config",
   "properties": {
     "upstreams": {
       "properties": {
@@ -13,7 +13,7 @@
                 "failOnError",
                 "fast"
               ],
-              "description": "Startup strategy controlling how initialization failures are handled.\n\n- `blocking`: Initialization runs before DNS resolution starts; errors are logged but Blocky keeps running if possible.\n- `failOnError`: Like blocking but Blocky exits with an error if initialization fails.\n- `fast`: Blocky serves DNS immediately and runs initialization in the background.",
+              "description": "Startup strategy controlling how initialization failures are handled.\n\n- `blocking`: Initialization runs before DNS resolution starts; errors are logged but Denyzer keeps running.\n- `failOnError`: Like blocking but Denyzer exits with an error if initialization fails.\n- `fast`: Denyzer serves DNS immediately and runs initialization in the background.",
               "default": "blocking"
             }
           },
@@ -217,7 +217,7 @@
               "description": "Source: an http(s) URL, a local file path, or an inline YAML block.",
               "examples": [
                 "https://example.com/list.txt",
-                "/etc/blocky/list.txt"
+                "/etc/denyzer/list.txt"
               ]
             },
             "type": "array"
@@ -232,7 +232,7 @@
               "description": "Source: an http(s) URL, a local file path, or an inline YAML block.",
               "examples": [
                 "https://example.com/list.txt",
-                "/etc/blocky/list.txt"
+                "/etc/denyzer/list.txt"
               ]
             },
             "type": "array"
@@ -321,7 +321,7 @@
                 "failOnError",
                 "fast"
               ],
-              "description": "Startup strategy controlling how initialization failures are handled.\n\n- `blocking`: Initialization runs before DNS resolution starts; errors are logged but Blocky keeps running if possible.\n- `failOnError`: Like blocking but Blocky exits with an error if initialization fails.\n- `fast`: Blocky serves DNS immediately and runs initialization in the background.",
+              "description": "Startup strategy controlling how initialization failures are handled.\n\n- `blocking`: Initialization runs before DNS resolution starts; errors are logged but Denyzer keeps running.\n- `failOnError`: Like blocking but Denyzer exits with an error if initialization fails.\n- `fast`: Denyzer serves DNS immediately and runs initialization in the background.",
               "default": "blocking"
             },
             "concurrency": {
@@ -439,7 +439,7 @@
                 },
                 "cachePath": {
                   "type": "string",
-                  "description": "Directory for the on-disk download cache. When empty (default), downloads are\nfully stateless: nothing is written to disk and every source is downloaded in\nfull on every refresh. When set, blocky uses HTTP conditional requests and\nserves unchanged/unavailable sources from this directory. Must be writable by\nthe user blocky runs as (UID 100 in the container image), otherwise caching is\nsilently skipped and downloads stay stateless."
+                  "description": "Directory for the on-disk download cache. When empty (default), downloads are\nfully stateless: nothing is written to disk and every source is downloaded in\nfull on every refresh. When set, denyzer uses HTTP conditional requests and\nserves unchanged/unavailable sources from this directory. Must be writable by\nthe user denyzer runs as (UID 100 in the container image), otherwise caching is\nsilently skipped and downloads stay stateless."
                 }
               },
               "additionalProperties": false,
@@ -458,7 +458,7 @@
               "description": "Source: an http(s) URL, a local file path, or an inline YAML block.",
               "examples": [
                 "https://example.com/list.txt",
-                "/etc/blocky/list.txt"
+                "/etc/denyzer/list.txt"
               ]
             },
             "type": "array"
@@ -473,7 +473,7 @@
               "description": "Source: an http(s) URL, a local file path, or an inline YAML block.",
               "examples": [
                 "https://example.com/list.txt",
-                "/etc/blocky/list.txt"
+                "/etc/denyzer/list.txt"
               ]
             },
             "type": "array"
@@ -644,7 +644,7 @@
         },
         "prefetching": {
           "type": "boolean",
-          "description": "If true, blocky preloads DNS results for frequently queried names before they expire."
+          "description": "If true, denyzer preloads DNS results for frequently queried names before they expire."
         },
         "prefetchExpires": {
           "anyOf": [
@@ -687,26 +687,28 @@
       "properties": {
         "target": {
           "type": "string",
-          "description": "Directory for CSV log files, file path for sqlite, or database URL for mysql/postgresql/timescale,\nor dnstap socket address (unix:/path, tcp://host:port, or bare /path for unix)."
+          "description": "Path of the SQLite database file, or a directory that stores it as\ndenyzer.db."
         },
         "type": {
           "type": "string",
           "enum": [
-            "console",
-            "none",
-            "mysql",
-            "postgresql",
-            "csv",
-            "csv-client",
-            "timescale",
             "sqlite",
-            "dnstap"
+            "console",
+            "none"
           ],
-          "description": "Log target type: mysql, postgresql, timescale, sqlite, csv, csv-client, console, dnstap, or none.\n\n- `console`: Log to console output (used when no type is set).\n- `none`: Do not log any queries.\n- `mysql`: Log each query to an external MySQL or MariaDB database.\n- `postgresql`: Log each query to an external PostgreSQL database.\n- `csv`: Log to a CSV file (one per day).\n- `csv-client`: Log to a CSV file (one per day and per client).\n- `timescale`: Log each query to an external Timescale database.\n- `sqlite`: Log each query to a local SQLite database file.\n- `dnstap`: Export query/response events via dnstap (Frame Streams)."
+          "description": "Log target type: sqlite (default when omitted), console, or none.\n\n- `sqlite`: Log each query to a local SQLite database file (default).\n- `console`: Log to console output; the dashboard has no data.\n- `none`: Do not log any queries."
         },
-        "logRetentionDays": {
-          "type": "integer",
-          "description": "Delete log entries older than this many days. 0 disables retention cleanup."
+        "retention": {
+          "properties": {
+            "historyMonths": {
+              "type": "integer",
+              "description": "Delete query logs and short-lived metrics older than N months (1-12).\n0 → default 1.",
+              "default": 1
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Per-table TTL retention settings for the embedded store."
         },
         "creationAttempts": {
           "type": "integer",
@@ -753,12 +755,17 @@
               "type": "integer"
             }
           ],
-          "description": "Interval at which buffered log entries are flushed in bulk to the database or dnstap socket\n(used by the mysql, postgresql, timescale, sqlite and dnstap targets).",
+          "description": "Interval at which buffered log entries are flushed in bulk to the database.",
           "default": "30s",
           "examples": [
             "30s",
             "1h"
           ]
+        },
+        "batchSize": {
+          "type": "integer",
+          "description": "Maximum number of entries accumulated before a flush is triggered.",
+          "default": 100
         },
         "ignore": {
           "properties": {
@@ -784,23 +791,6 @@
       "type": "object",
       "description": "Query logging configuration."
     },
-    "prometheus": {
-      "properties": {
-        "enable": {
-          "type": "boolean",
-          "description": "If true, enables the Prometheus metrics endpoint.",
-          "default": false
-        },
-        "path": {
-          "type": "string",
-          "description": "URL path under which the Prometheus metrics are served.",
-          "default": "/metrics"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "description": "Prometheus metrics configuration."
-    },
     "statistics": {
       "properties": {
         "enable": {
@@ -812,75 +802,6 @@
       "additionalProperties": false,
       "type": "object",
       "description": "In-memory statistics subsystem (24h window), served at /api/stats."
-    },
-    "redis": {
-      "properties": {
-        "address": {
-          "type": "string",
-          "description": "Server address and port (e.g. `localhost:6379`), a unix socket path (e.g. `/var/run/redis/redis.sock`),\nor the sentinel master name when sentinel is used. An address starting with `/` is treated as a unix socket."
-        },
-        "username": {
-          "type": "string",
-          "description": "Redis username (if authentication is required).",
-          "default": ""
-        },
-        "password": {
-          "type": "string",
-          "description": "Redis password (if authentication is required).",
-          "default": ""
-        },
-        "database": {
-          "type": "integer",
-          "description": "Redis database index to use.",
-          "default": 0
-        },
-        "required": {
-          "type": "boolean",
-          "description": "If true, blocky will not start when the Redis connection cannot be established.",
-          "default": false
-        },
-        "connectionAttempts": {
-          "type": "integer",
-          "description": "Maximum number of connection attempts before giving up.",
-          "default": 3
-        },
-        "connectionCooldown": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "integer"
-            }
-          ],
-          "description": "Delay between consecutive connection attempts.",
-          "default": "1s",
-          "examples": [
-            "30s",
-            "1h"
-          ]
-        },
-        "sentinelUsername": {
-          "type": "string",
-          "description": "Sentinel username (if sentinel authentication is required).",
-          "default": ""
-        },
-        "sentinelPassword": {
-          "type": "string",
-          "description": "Sentinel password (if sentinel authentication is required).",
-          "default": ""
-        },
-        "sentinelAddresses": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "List of Redis Sentinel host:port addresses; enables sentinel mode when non-empty."
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "description": "Redis configuration for cache and state synchronization between instances."
     },
     "log": {
       "properties": {
@@ -1133,7 +1054,7 @@
             "description": "Source: an http(s) URL, a local file path, or an inline YAML block.",
             "examples": [
               "https://example.com/list.txt",
-              "/etc/blocky/list.txt"
+              "/etc/denyzer/list.txt"
             ]
           },
           "type": "array",
@@ -1168,7 +1089,7 @@
                 "failOnError",
                 "fast"
               ],
-              "description": "Startup strategy controlling how initialization failures are handled.\n\n- `blocking`: Initialization runs before DNS resolution starts; errors are logged but Blocky keeps running if possible.\n- `failOnError`: Like blocking but Blocky exits with an error if initialization fails.\n- `fast`: Blocky serves DNS immediately and runs initialization in the background.",
+              "description": "Startup strategy controlling how initialization failures are handled.\n\n- `blocking`: Initialization runs before DNS resolution starts; errors are logged but Denyzer keeps running.\n- `failOnError`: Like blocking but Denyzer exits with an error if initialization fails.\n- `fast`: Denyzer serves DNS immediately and runs initialization in the background.",
               "default": "blocking"
             },
             "concurrency": {
@@ -1286,7 +1207,7 @@
                 },
                 "cachePath": {
                   "type": "string",
-                  "description": "Directory for the on-disk download cache. When empty (default), downloads are\nfully stateless: nothing is written to disk and every source is downloaded in\nfull on every refresh. When set, blocky uses HTTP conditional requests and\nserves unchanged/unavailable sources from this directory. Must be writable by\nthe user blocky runs as (UID 100 in the container image), otherwise caching is\nsilently skipped and downloads stay stateless."
+                  "description": "Directory for the on-disk download cache. When empty (default), downloads are\nfully stateless: nothing is written to disk and every source is downloaded in\nfull on every refresh. When set, denyzer uses HTTP conditional requests and\nserves unchanged/unavailable sources from this directory. Must be writable by\nthe user denyzer runs as (UID 100 in the container image), otherwise caching is\nsilently skipped and downloads stay stateless."
                 }
               },
               "additionalProperties": false,
@@ -1318,7 +1239,7 @@
           "deprecated": true,
           "examples": [
             "https://example.com/list.txt",
-            "/etc/blocky/list.txt"
+            "/etc/denyzer/list.txt"
           ]
         }
       },
@@ -1335,7 +1256,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "When enabled, blocky returns NXDOMAIN immediately for non-FQDN queries."
+      "description": "When enabled, denyzer returns NXDOMAIN immediately for non-FQDN queries."
     },
     "filtering": {
       "properties": {

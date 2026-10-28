@@ -1,7 +1,7 @@
 package stringcache_test
 
 import (
-	"github.com/0xERR0R/blocky/cache/stringcache"
+	"github.com/mia0x75/denyzer/cache/stringcache"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/sirupsen/logrus"
 )

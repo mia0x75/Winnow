@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/0xERR0R/blocky/log"
+	"github.com/mia0x75/denyzer/log"
 
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
@@ -128,13 +128,13 @@ func CreateSOAForNegativeResponse(question dns.Question, blockTTL uint32) *dns.S
 			Class:  dns.ClassINET,
 			Ttl:    blockTTL,
 		},
-		Ns:      "blocky.local.",            // Name server
-		Mbox:    "hostmaster.blocky.local.", // Mailbox (admin contact)
-		Serial:  1,                          // Serial number
-		Refresh: soaRefresh,                 // 24 hours
-		Retry:   soaRetry,                   // 2 hours
-		Expire:  soaExpire,                  // 7 days
-		Minttl:  blockTTL,                   // Negative caching TTL (RFC 2308)
+		Ns:      "denyzer.local.",            // Name server
+		Mbox:    "hostmaster.denyzer.local.", // Mailbox (admin contact)
+		Serial:  1,                           // Serial number
+		Refresh: soaRefresh,                  // 24 hours
+		Retry:   soaRetry,                    // 2 hours
+		Expire:  soaExpire,                   // 7 days
+		Minttl:  blockTTL,                    // Negative caching TTL (RFC 2308)
 	}
 }
 

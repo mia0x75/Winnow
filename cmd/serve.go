@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/server"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/server"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/spf13/cobra"
 )
@@ -34,7 +34,7 @@ func newServeCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:               "serve",
 		Args:              cobra.NoArgs,
-		Short:             "start blocky DNS server (default command)",
+		Short:             "start denyzer DNS server (default command)",
 		RunE:              startServer,
 		PersistentPreRunE: initConfigPreRun,
 		SilenceUsage:      true,
@@ -135,19 +135,16 @@ func startServer(_ *cobra.Command, _ []string) error {
 }
 
 func printBanner() {
-	log.Log().Info("_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/")
-	log.Log().Info("_/                                                              _/")
-	log.Log().Info("_/                                                              _/")
-	log.Log().Info("_/       _/        _/                      _/                   _/")
-	log.Log().Info("_/      _/_/_/    _/    _/_/      _/_/_/  _/  _/    _/    _/    _/")
-	log.Log().Info("_/     _/    _/  _/  _/    _/  _/        _/_/      _/    _/     _/")
-	log.Log().Info("_/    _/    _/  _/  _/    _/  _/        _/  _/    _/    _/      _/")
-	log.Log().Info("_/   _/_/_/    _/    _/_/      _/_/_/  _/    _/    _/_/_/       _/")
-	log.Log().Info("_/                                                    _/        _/")
-	log.Log().Info("_/                                               _/_/           _/")
-	log.Log().Info("_/                                                              _/")
-	log.Log().Info("_/                                                              _/")
-	log.Log().Infof("_/  Version: %-18s Build time: %-18s  _/", util.Version, util.BuildTime)
-	log.Log().Info("_/                                                              _/")
-	log.Log().Info("_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/")
+	log.Log().Info("+-------------------------------------------------------------+")
+	log.Log().Info("|                                                             |")
+	log.Log().Info("|   ▀▀▀▀██▄                                                   |")
+	log.Log().Info("|   ░░░ ███                                                   |")
+	log.Log().Info("|   ▒▒▒ ███ ▄██▀██▄ ███▀██▄ ███ ███ ███████ ▄██▀██▄ ▄██▀██▄   |")
+	log.Log().Info("|   ▓▓▓ ███ ███ ███ ███ ███ ███ ███    ▄██▀ ███ ███ ███ ███   |")
+	log.Log().Info("|   ███ ███ ███▀▀▀▀ ███ ███  ▀▀▀███   ██▀   ███▀▀▀▀ ███       |")
+	log.Log().Info("|   ███ ███ ███ ███ ███ ███ ███ ███ ▄██▀    ███ ███ ███       |")
+	log.Log().Info("|   ███▄██▀ ▀██▄██▀ ███ ███ ▀██▄██▀ ███████ ▀██▄██▀ ███       |")
+	log.Log().Infof("|   Version: %-16s Build time: %-18s  |", util.Version, util.BuildTime)
+	log.Log().Info("|                                                             |")
+	log.Log().Info("+-------------------------------------------------------------+")
 }

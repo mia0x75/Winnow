@@ -25,7 +25,7 @@ func NewTmpFolder(prefix string) *TmpFolder {
 	ipref := prefix
 
 	if len(ipref) == 0 {
-		ipref = "blocky"
+		ipref = "denyzer"
 	}
 
 	path, err := os.MkdirTemp("", ipref)

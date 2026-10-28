@@ -13,7 +13,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"gopkg.in/yaml.v2"
 
-	"github.com/0xERR0R/blocky/docs"
+	"github.com/mia0x75/denyzer/docs"
 )
 
 // JSON is the embedded config JSON schema, generated into docs/ and embedded
@@ -69,8 +69,7 @@ func ValidateYAML(data []byte) ([]Error, error) {
 	}
 
 	if err := compiled.Validate(instance); err != nil {
-		var ve *jsonschema.ValidationError
-		if errors.As(err, &ve) {
+		if ve, ok := errors.AsType[*jsonschema.ValidationError](err); ok {
 			return flatten(ve), nil
 		}
 

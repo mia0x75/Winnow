@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/stats"
-	"github.com/0xERR0R/blocky/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/stats"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/stretchr/testify/mock"
 
-	. "github.com/0xERR0R/blocky/helpertest"
+	. "github.com/mia0x75/denyzer/helpertest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -128,7 +128,7 @@ var _ = Describe("API implementation tests", func() {
 			})
 
 			It("extracts metadata from the HTTP request", func() {
-				r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://blocky.localhost", nil)
+				r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://denyzer.localhost", nil)
 				Expect(err).Should(Succeed())
 
 				clientIP := net.IPv4allrouter
@@ -137,7 +137,7 @@ var _ = Describe("API implementation tests", func() {
 				ctx = context.WithValue(ctx, httpReqCtxKey{}, r)
 
 				expectedErr := errors.New("test")
-				querierMock.On("Query", ctx, "blocky.localhost", clientIP, "example.com.", A).Return(nil, expectedErr)
+				querierMock.On("Query", ctx, "denyzer.localhost", clientIP, "example.com.", A).Return(nil, expectedErr)
 
 				_, err = sut.Query(ctx, QueryRequestObject{
 					Body: &ApiQueryRequest{

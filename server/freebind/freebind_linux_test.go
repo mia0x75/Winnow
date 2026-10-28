@@ -6,7 +6,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/0xERR0R/blocky/server/freebind"
+	"github.com/mia0x75/denyzer/server/freebind"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

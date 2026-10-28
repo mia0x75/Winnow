@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/util"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,9 +17,9 @@ import (
 
 var _ = Describe("Domain blocking functionality", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -34,7 +34,7 @@ var _ = Describe("Domain blocking functionality", func() {
 		Context("when blocklist is unavailable", func() {
 			Context("with loading.strategy = blocking", func() {
 				BeforeEach(func(ctx context.Context) {
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						log:
 						  level: warn
 						upstreams:
@@ -57,7 +57,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				It("starts with warning and continues to function", func(ctx context.Context) {
 					// Verify DNS resolution still works
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "1.2.3.4"),
@@ -65,13 +65,13 @@ var _ = Describe("Domain blocking functionality", func() {
 							))
 
 					// Verify warning in logs
-					Expect(getContainerLogs(ctx, blocky)).Should(ContainElement(ContainSubstring("cannot open source: ")))
+					Expect(getContainerLogs(ctx, denyzer)).Should(ContainElement(ContainSubstring("cannot open source: ")))
 				})
 			})
 
 			Context("with loading.strategy = failOnError", func() {
 				BeforeEach(func(ctx context.Context) {
-					blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+					denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 						log:
 						  level: warn
 						upstreams:
@@ -91,14 +91,14 @@ var _ = Describe("Domain blocking functionality", func() {
 					Expect(err).Should(HaveOccurred())
 
 					// Verify container exit status
-					state, err := blocky.State(ctx)
+					state, err := denyzer.State(ctx)
 					Expect(err).Should(Succeed())
 					Expect(state.ExitCode).Should(Equal(1))
 				})
 
 				It("fails to start with appropriate error message", func(ctx context.Context) {
-					Eventually(blocky.IsRunning, "5s", "2ms").Should(BeFalse())
-					Expect(getContainerLogs(ctx, blocky)).
+					Eventually(denyzer.IsRunning, "5s", "2ms").Should(BeFalse())
+					Expect(getContainerLogs(ctx, denyzer)).
 						Should(ContainElement(SatisfyAll(ContainSubstring("Error: can't start server:"),
 							ContainSubstring("1 error occurred"))))
 				})
@@ -113,7 +113,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blockeddomain.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -134,7 +134,7 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("blocks domains listed in external blocklists", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blockeddomain.com.", A)
 
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("blockeddomain.com.", A, "0.0.0.0"),
@@ -142,7 +142,7 @@ var _ = Describe("Domain blocking functionality", func() {
 						))
 
 				// No errors should be logged
-				Expect(getContainerLogs(ctx, blocky)).Should(BeEmpty())
+				Expect(getContainerLogs(ctx, denyzer)).Should(BeEmpty())
 			})
 		})
 	})
@@ -161,7 +161,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -182,7 +182,7 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("blocks domains matching wildcard patterns", func(ctx context.Context) {
 				By("blocking the domain", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("blocked.com.", A, "0.0.0.0"),
@@ -192,7 +192,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("blocking subdomains", func() {
 					msg := util.NewMsgWithQuestion("subdomain.blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("subdomain.blocked.com.", A, "0.0.0.0"),
@@ -200,7 +200,7 @@ var _ = Describe("Domain blocking functionality", func() {
 							))
 
 					msg = util.NewMsgWithQuestion("deep.sub.blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("deep.sub.blocked.com.", A, "0.0.0.0"),
@@ -210,7 +210,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("blocking specific subdomain wildcards", func() {
 					msg := util.NewMsgWithQuestion("tracker.ads.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("tracker.ads.example.com.", A, "0.0.0.0"),
@@ -220,7 +220,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("allowing non-matching domains", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "1.2.3.4"),
@@ -242,7 +242,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				Expect(err).Should(Succeed())
 
 				// Create HTTP server with regex blocklist
-				// Note: Single backslash in regex patterns for blocky
+				// Note: Single backslash in regex patterns for denyzer
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt",
 					"/^ad[sx]?./",
 					"/^tracker[0-9]+.example.com$/",
@@ -250,7 +250,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -271,7 +271,7 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("blocks domains matching regex patterns", func(ctx context.Context) {
 				By("blocking domains matching prefix pattern", func() {
 					msg := util.NewMsgWithQuestion("ad.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("ad.example.com.", A, "0.0.0.0"),
@@ -279,7 +279,7 @@ var _ = Describe("Domain blocking functionality", func() {
 							))
 
 					msg = util.NewMsgWithQuestion("ads.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("ads.example.com.", A, "0.0.0.0"),
@@ -287,7 +287,7 @@ var _ = Describe("Domain blocking functionality", func() {
 							))
 
 					msg = util.NewMsgWithQuestion("adx.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("adx.example.com.", A, "0.0.0.0"),
@@ -297,7 +297,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("blocking domains matching numeric pattern", func() {
 					msg := util.NewMsgWithQuestion("tracker123.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("tracker123.example.com.", A, "0.0.0.0"),
@@ -307,7 +307,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("blocking domains matching alternation pattern", func() {
 					msg := util.NewMsgWithQuestion("apple.de.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("apple.de.", A, "0.0.0.0"),
@@ -315,7 +315,7 @@ var _ = Describe("Domain blocking functionality", func() {
 							))
 
 					msg = util.NewMsgWithQuestion("apple.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("apple.com.", A, "0.0.0.0"),
@@ -325,7 +325,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("allowing non-matching domains", func() {
 					msg := util.NewMsgWithQuestion("google.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("google.com.", A, "1.2.3.4"),
@@ -334,7 +334,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 					// apple.fr should not match the pattern
 					msg = util.NewMsgWithQuestion("apple.fr.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(
 							SatisfyAll(
 								BeDNSRecord("apple.fr.", A, "1.2.3.4"),
@@ -351,7 +351,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -373,13 +373,13 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("returns zero IP for blocked domains", func(ctx context.Context) {
 				By("returning 0.0.0.0 for A records", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "0.0.0.0"))
 				})
 
 				By("returning :: for AAAA records", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", AAAA)
-					resp, err := doDNSRequest(ctx, blocky, msg)
+					resp, err := doDNSRequest(ctx, denyzer, msg)
 					Expect(err).Should(Succeed())
 					Expect(resp.Answer).Should(HaveLen(1))
 					Expect(resp.Answer[0].String()).Should(ContainSubstring("::"))
@@ -392,7 +392,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -413,7 +413,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("returns NXDOMAIN with SOA record for blocked domains", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blocked.com.", A)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				By("returning NXDOMAIN response code", func() {
@@ -434,8 +434,8 @@ var _ = Describe("Domain blocking functionality", func() {
 					Expect(soa.Header().Name).Should(Equal("blocked.com."))
 					Expect(soa.Header().Rrtype).Should(Equal(dns.TypeSOA))
 					Expect(soa.Header().Ttl).Should(Equal(uint32(6 * 60 * 60))) // Default 6 hours
-					Expect(soa.Ns).Should(Equal("blocky.local."))
-					Expect(soa.Mbox).Should(Equal("hostmaster.blocky.local."))
+					Expect(soa.Ns).Should(Equal("denyzer.local."))
+					Expect(soa.Mbox).Should(Equal("hostmaster.denyzer.local."))
 					Expect(soa.Minttl).Should(Equal(uint32(6 * 60 * 60))) // RFC 2308 negative caching TTL
 				})
 			})
@@ -446,7 +446,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -467,7 +467,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("returns REFUSED without records for blocked domains", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blocked.com.", A)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				By("returning REFUSED response code", func() {
@@ -485,7 +485,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("returns REFUSED for query types other than A/AAAA", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blocked.com.", TXT)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 				Expect(resp.Rcode).Should(Equal(dns.RcodeRefused))
 				Expect(resp.Answer).Should(BeEmpty())
@@ -497,7 +497,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -519,13 +519,13 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("returns custom IPs for blocked domains", func(ctx context.Context) {
 				By("returning custom IPv4 for A records", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "192.168.1.1"))
 				})
 
 				By("returning custom IPv6 for AAAA records", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", AAAA)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", AAAA, "2001:db8::1"))
 				})
 			})
@@ -538,7 +538,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -559,7 +559,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("uses the configured TTL for blocked responses", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blocked.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(
 						SatisfyAll(
 							BeDNSRecord("blocked.com.", A, "0.0.0.0"),
@@ -573,7 +573,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -595,7 +595,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("uses the configured TTL in SOA record for NXDOMAIN responses", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blocked.com.", A)
-				resp, err := doDNSRequest(ctx, blocky, msg)
+				resp, err := doDNSRequest(ctx, denyzer, msg)
 				Expect(err).Should(Succeed())
 
 				Expect(resp.Rcode).Should(Equal(dns.RcodeNameError))
@@ -624,7 +624,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "192.168.100.50")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -645,13 +645,13 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("blocks domains that resolve to blocked IPs", func(ctx context.Context) {
 				By("blocking domains with IPs in the blocklist", func() {
 					msg := util.NewMsgWithQuestion("tracking.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("tracking.example.com.", A, "0.0.0.0"))
 				})
 
 				By("allowing domains with IPs not in the blocklist", func() {
 					msg := util.NewMsgWithQuestion("safe.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("safe.example.com.", A, "8.8.8.8"))
 				})
 			})
@@ -662,7 +662,7 @@ var _ = Describe("Domain blocking functionality", func() {
 		Context("with CNAME targets in blocklist", func() {
 			BeforeEach(func(ctx context.Context) {
 				// Setup mock DNS with CNAME records
-				// Note: Blocky blocks based on CNAME targets in the response
+				// Note: Denyzer blocks based on CNAME targets in the response
 				_, err = createDNSMokkaContainer(ctx, "moka2", e2eNet,
 					`A alias.example.com/NOERROR("CNAME tracker.ads.com. 300", "A 1.2.3.4 300")`,
 				)
@@ -672,7 +672,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "tracker.ads.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -693,7 +693,7 @@ var _ = Describe("Domain blocking functionality", func() {
 			It("blocks domains with CNAME targets in the blocklist", func(ctx context.Context) {
 				By("blocking domains that CNAME to blocked domains", func() {
 					msg := util.NewMsgWithQuestion("alias.example.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("alias.example.com.", A, "0.0.0.0"))
 				})
 			})
@@ -713,7 +713,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -734,13 +734,13 @@ var _ = Describe("Domain blocking functionality", func() {
 			})
 
 			It("can enable and disable blocking via API", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				baseURL := "http://" + net.JoinHostPort(host, port)
 
 				By("verifying blocking is enabled by default", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "0.0.0.0"))
 				})
 
@@ -752,7 +752,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 					// Verify blocked domain now resolves normally from upstream
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "5.6.7.8"))
 				})
 
@@ -764,7 +764,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 					// Verify domain is blocked again
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "0.0.0.0"))
 				})
 
@@ -784,7 +784,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				_, err = createHTTPServerContainer(ctx, "httpserver", e2eNet, "list.txt", "blocked.com")
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					log:
 					  level: warn
 					upstreams:
@@ -805,7 +805,7 @@ var _ = Describe("Domain blocking functionality", func() {
 			})
 
 			It("can refresh blocklists via API", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				baseURL := "http://" + net.JoinHostPort(host, port)
 
@@ -818,7 +818,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 				By("verifying blocking still works after refresh", func() {
 					msg := util.NewMsgWithQuestion("blocked.com.", A)
-					Expect(doDNSRequest(ctx, blocky, msg)).
+					Expect(doDNSRequest(ctx, denyzer, msg)).
 						Should(BeDNSRecord("blocked.com.", A, "0.0.0.0"))
 				})
 			})
@@ -851,7 +851,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				today := weekdayNames[wd]
 				tomorrow := weekdayNames[(wd+1)%7]
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(fmt.Sprintf(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(fmt.Sprintf(`
 					log:
 					  level: warn
 					upstreams:
@@ -876,7 +876,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("blocks domains in the scheduled list", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blockeddomain.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("blockeddomain.com.", A, "0.0.0.0"))
 			})
 		})
@@ -888,7 +888,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				// rolls over between BeforeEach and the DNS query.
 				twoDaysOut := weekdayNames[(int(time.Now().UTC().Weekday())+2)%7]
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(fmt.Sprintf(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(fmt.Sprintf(`
 					log:
 					  level: warn
 					upstreams:
@@ -913,7 +913,7 @@ var _ = Describe("Domain blocking functionality", func() {
 
 			It("lets the domain resolve via the upstream", func(ctx context.Context) {
 				msg := util.NewMsgWithQuestion("blockeddomain.com.", A)
-				Expect(doDNSRequest(ctx, blocky, msg)).
+				Expect(doDNSRequest(ctx, denyzer, msg)).
 					Should(BeDNSRecord("blockeddomain.com.", A, "5.6.7.8"))
 			})
 		})
@@ -940,7 +940,7 @@ var _ = Describe("Domain blocking functionality", func() {
 				"social.example.com")
 			Expect(err).Should(Succeed())
 
-			blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+			denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 				log:
 				  level: warn
 				upstreams:
@@ -964,19 +964,19 @@ var _ = Describe("Domain blocking functionality", func() {
 
 		It("resolves a domain that is on neither list", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("unrelated.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(BeDNSRecord("unrelated.com.", A, "1.2.3.4"))
 		})
 
 		It("still blocks a denylisted domain", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("blockeddomain.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(BeDNSRecord("blockeddomain.com.", A, "0.0.0.0"))
 		})
 
 		It("allows a denylisted domain that the allowlist group excepts", func(ctx context.Context) {
 			msg := util.NewMsgWithQuestion("social.example.com.", A)
-			Expect(doDNSRequest(ctx, blocky, msg)).
+			Expect(doDNSRequest(ctx, denyzer, msg)).
 				Should(BeDNSRecord("social.example.com.", A, "5.6.7.8"))
 		})
 	})

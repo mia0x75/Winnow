@@ -2,3 +2,7 @@ package: api
 generate:
   client: true
 output: api_client.gen.go
+# Dashboard-only operations are documented (and served) but not code-generated.
+output-options:
+  exclude-tags:
+    - dashboard

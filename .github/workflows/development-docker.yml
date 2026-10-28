@@ -29,7 +29,7 @@ jobs:
         run: |
           ENABLED=${{ secrets.DEVELOPMENT_DOCKER }}
 
-          if [[ "${{ github.repository_owner }}" == "0xERR0R" ]]; then
+          if [[ "${{ github.repository_owner }}" == "mia0x75" ]]; then
             ENABLED="true"
           fi          
 
@@ -40,7 +40,7 @@ jobs:
             echo "### Workflow is disabled" >> $GITHUB_STEP_SUMMARY
             echo "To enable this workflow by creating a secret 'DEVELOPMENT_DOCKER' with the value 'true'" >> $GITHUB_STEP_SUMMARY
           else
-            if [[ "${{ github.repository_owner }}" != "0xERR0R" && "${GITHUB_REF#refs/heads/}" == "main" ]]; then
+            if [[ "${{ github.repository_owner }}" != "mia0x75" && "${GITHUB_REF#refs/heads/}" == "main" ]]; then
               echo "enabled=0" >> $GITHUB_OUTPUT
               echo "Workflow is disabled for main branch on forks"
             else 
@@ -86,7 +86,7 @@ jobs:
           password: ${{ steps.get_token.outputs.token }}
 
       - name: Login to DockerHub
-        if: github.repository_owner == '0xERR0R'
+        if: github.repository_owner == 'mia0x75'
         uses: docker/login-action@v4.6.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -120,10 +120,10 @@ jobs:
           if [[ "${BRANCH}" == "main" ]]; then
             TAGS="${TAGS} , ghcr.io/${REPOSITORY}:development"
           fi
-          if [[ "${{ github.repository_owner }}" == "0xERR0R" ]]; then
-            TAGS="${TAGS} , spx01/blocky:${BRANCH}"
+          if [[ "${{ github.repository_owner }}" == "mia0x75" ]]; then
+            TAGS="${TAGS} , mia0x75/denyzer:${BRANCH}"
             if [[ "${BRANCH}" == "main" ]]; then
-              TAGS="${TAGS} , spx01/blocky:development"
+              TAGS="${TAGS} , mia0x75/denyzer:development"
             fi
           fi
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT

@@ -48,17 +48,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xERR0R/blocky/cache"
-	"github.com/0xERR0R/blocky/metrics"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
-	expirationcache "github.com/0xERR0R/expiration-cache"
+	"github.com/mia0x75/denyzer/cache"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 	"github.com/miekg/dns"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
-const ednsUDPSize = 4096 // EDNS UDP buffer size for DNSSEC queries
+const (
+	ednsUDPSize = 4096 // EDNS UDP buffer size for DNSSEC queries
+
+	// validationCacheSize caps the DNSSEC validation result cache, mirroring the
+	// entry capacity of the legacy expiration-cache it replaced.
+	validationCacheSize = 10000
+)
 
 var (
 	errUnsupportedRSAExponent = errors.New("unsupported RSA exponent exceeds Go crypto limit")
@@ -105,40 +108,10 @@ type Validator struct {
 	maxNSEC3Iterations    uint // Maximum NSEC3 iterations (RFC 5155 §10.3)
 	maxUpstreamQueries    uint // Maximum upstream queries per validation (DoS protection)
 	clockSkewToleranceSec uint // Clock skew tolerance in seconds (RFC 6781 §4.1.2)
-	validationMetrics     *prometheus.CounterVec
-	cacheHitMetrics       prometheus.Counter
-	validationDuration    *prometheus.HistogramVec
 }
 
-// initializeMetrics initializes and registers Prometheus metrics for the validator
+// initializeMetrics is a no-op kept for structural compatibility.
 func (v *Validator) initializeMetrics() {
-	v.validationMetrics = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "blocky_dnssec_validation_total",
-			Help: "Number of DNSSEC validations by result",
-		},
-		[]string{"result"},
-	)
-
-	v.cacheHitMetrics = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "blocky_dnssec_cache_hits_total",
-			Help: "Number of DNSSEC validation cache hits",
-		},
-	)
-
-	v.validationDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "blocky_dnssec_validation_duration_seconds",
-			Help:    "Duration of DNSSEC validation operations",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"result"},
-	)
-
-	metrics.RegisterMetric(v.validationMetrics)
-	metrics.RegisterMetric(v.cacheHitMetrics)
-	metrics.RegisterMetric(v.validationDuration)
 }
 
 // NewValidator creates a new DNSSEC validator with the given configuration.
@@ -187,9 +160,9 @@ func NewValidator(
 		trustAnchors: trustAnchors,
 		logger:       logger,
 		upstream:     upstream,
-		validationCache: expirationcache.NewCache[ValidationResult](ctx, expirationcache.Options{
+		validationCache: cache.NewCache[ValidationResult](cache.Options{
 			CleanupInterval: time.Hour,
-			Shards:          cache.ShardCount(),
+			MaxSize:         validationCacheSize,
 		}),
 		cacheExpiration:       time.Duration(cacheExpirationHours) * time.Hour,
 		maxChainDepth:         maxChainDepth,
@@ -359,11 +332,8 @@ func (v *Validator) validateAuthorityOrAdditional(
 	return result
 }
 
-// recordMetrics records validation metrics
+// recordMetrics is a no-op; metric recording was removed with Prometheus support.
 func (v *Validator) recordMetrics(start time.Time, result ValidationResult) {
-	duration := time.Since(start)
-	v.validationMetrics.WithLabelValues(result.String()).Inc()
-	v.validationDuration.WithLabelValues(result.String()).Observe(duration.Seconds())
 }
 
 // extractRRSIGs extracts all RRSIG records from a slice of RRs

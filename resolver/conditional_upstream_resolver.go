@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
@@ -35,7 +35,7 @@ func NewConditionalUpstreamResolver(
 		// Override init strategy for conditional upstreams to always use blocking initialization.
 		// This ensures conditional upstreams are always ready to resolve their domains,
 		// even if the default upstream is unreachable during async initialization.
-		// See: https://github.com/0xERR0R/blocky/issues/1639
+		// See: https://github.com/mia0x75/denyzer/issues/1639
 		groupCfg.Init.Strategy = config.InitStrategyBlocking
 
 		r, err := NewParallelBestResolver(ctx, groupCfg, bootstrap)

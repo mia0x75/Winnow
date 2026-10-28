@@ -65,9 +65,9 @@ func (t ResponseType) ToExtendedErrorCode() uint16 {
 type Response struct {
 	Res    *dns.Msg
 	Reason string
-	// ReasonLabel is a low-cardinality variant of Reason, used as a Prometheus
-	// metric label. When empty, metrics fall back to Reason. Blocked responses
-	// set this to the matched group names only (without the matched rule), to
+	// ReasonLabel is a low-cardinality variant of Reason, used as a metric
+	// label in statistics. When empty, all consumers fall back to Reason. Blocked
+	// responses set this to the matched group names only (without the matched rule), to
 	// keep the `reason` label bounded even with large deny lists.
 	ReasonLabel string
 	RType       ResponseType

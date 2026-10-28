@@ -55,7 +55,7 @@ func (s *QTypeSet) UnmarshalYAML(unmarshal func(any) error) error {
 		}
 
 		var qType QType
-		if err := qType.UnmarshalText([]byte(fmt.Sprintf("%v", raw))); err != nil {
+		if err := qType.UnmarshalText(fmt.Appendf(nil, "%v", raw)); err != nil {
 			return err
 		}
 

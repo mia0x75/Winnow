@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("DoH functionality", func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -29,7 +29,7 @@ var _ = Describe("DoH functionality", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka1", e2eNet, `A google/NOERROR("A 1.2.3.4 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -42,7 +42,7 @@ var _ = Describe("DoH functionality", func() {
 			})
 
 			It("serves DoH content on the custom path and not on the default path", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				url := "http://" + net.JoinHostPort(host, port)
 
@@ -63,7 +63,7 @@ var _ = Describe("DoH functionality", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka1", e2eNet, `A google/NOERROR("A 1.2.3.4 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -75,7 +75,7 @@ var _ = Describe("DoH functionality", func() {
 			})
 
 			It("serves DoH content on the default path", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				url := "http://" + net.JoinHostPort(host, port)
 
@@ -89,7 +89,7 @@ var _ = Describe("DoH functionality", func() {
 				_, err = createDNSMokkaContainer(ctx, "moka1", e2eNet, `A google/NOERROR("A 1.2.3.4 123")`)
 				Expect(err).Should(Succeed())
 
-				blocky, err = createBlockyContainerFromString(ctx, e2eNet, dedent(`
+				denyzer, err = createDenyzerContainerFromString(ctx, e2eNet, dedent(`
 					upstreams:
 					  groups:
 					    default:
@@ -102,7 +102,7 @@ var _ = Describe("DoH functionality", func() {
 			})
 
 			It("serves DoH content on the custom path with HTTPS", func(ctx context.Context) {
-				host, port, err := getContainerHostPort(ctx, blocky, "4000/tcp")
+				host, port, err := getContainerHostPort(ctx, denyzer, "4000/tcp")
 				Expect(err).Should(Succeed())
 				url := "https://" + net.JoinHostPort(host, port)
 

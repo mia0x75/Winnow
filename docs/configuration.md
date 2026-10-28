@@ -12,7 +12,7 @@ editor autocomplete and validation (see [Editor support and validation](#editor-
 
 ## Editor support and validation
 
-Blocky ships a [JSON schema](https://raw.githubusercontent.com/0xERR0R/blocky/main/docs/config.schema.json)
+Denyzer ships a [JSON schema](https://raw.githubusercontent.com/mia0x75/denyzer/main/docs/config.schema.json)
 generated from its configuration types. Editors with the
 [YAML Language Server](https://github.com/redhat-developer/yaml-language-server)
 (for example VS Code with the *YAML* extension) use it for autocomplete,
@@ -20,21 +20,21 @@ inline documentation and validation. Add this modeline to the top of your
 `config.yml`:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/0xERR0R/blocky/main/docs/config.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/mia0x75/denyzer/main/docs/config.schema.json
 ```
 
-The same schema is used by `blocky validate`, which reports unknown keys and
+The same schema is used by `denyzer validate`, which reports unknown keys and
 invalid values with their field path. Schema validation is a structural
-first pass; blocky still performs its full semantic checks when loading the
+first pass; denyzer still performs its full semantic checks when loading the
 configuration.
 
 ## Multiple configuration files
 
-Instead of a single file, `--config` can point to a **folder**. Blocky then loads every `*.yml` and `*.yaml`
+Instead of a single file, `--config` can point to a **folder**. Denyzer then loads every `*.yml` and `*.yaml`
 file in that folder (subfolders included) and merges them into one configuration:
 
 - Files are applied in **lexical (alphabetical) path order** — use number prefixes like `00_base.yml`,
-  `10_local.yml` to make the order explicit. Blocky logs the merge order at startup.
+  `10_local.yml` to make the order explicit. Denyzer logs the merge order at startup.
 - **Mappings merge recursively**: keys from later files are added; keys present on both sides merge field by
   field.
 - **Everything else is replaced**: when several files set the same scalar or list, the last file wins,
@@ -100,8 +100,8 @@ All values in this section are optional.
 |---------------|-----------------------|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | ports.dns     | One or more [IP]:Port | 53            | Listen address for DNS (TCP and UDP). Example: `53`, `:53`, `192.168.0.1:53`, `[53, "[::1]:53"]`                                                  |
 | ports.tls     | One or more [IP]:Port |               | Listen address for DoT (DNS-over-TLS). Example: `83`, `:853`, `192.168.0.1:853`, `[853, "[::1]:853"]`                                             |
-| ports.http    | One or more [IP]:Port |               | Listen address for HTTP used for prometheus metrics, pprof, REST API, DoH... Example: `4000`, `:4000`, `192.168.0.1:4000`, `[4000, "[::1]:4000"]` |
-| ports.https   | One or more [IP]:Port |               | Listen address for HTTPS used for prometheus metrics, pprof, REST API, DoH... Example: `443`, `:443`, `192.168.0.1:443`, `[443, "[::1]:443"]`     |
+| ports.http    | One or more [IP]:Port |               | Listen address for HTTP used for pprof, REST API, dashboard, DoH... Example: `4000`, `:4000`, `192.168.0.1:4000`, `[4000, "[::1]:4000"]` |
+| ports.https   | One or more [IP]:Port |               | Listen address for HTTPS used for pprof, REST API, dashboard, DoH... Example: `443`, `:443`, `192.168.0.1:443`, `[443, "[::1]:443"]`     |
 | ports.dohPath | string                | /dns-query    | URL path for DoH queries.                                                                                                                         |
 | ports.freeBind | bool                 | false         | Allow binding the DNS/DoT listeners to addresses not yet assigned to an interface (Linux only, via `IP_FREEBIND`; e.g. Tailscale/WireGuard/VRRP). No effect on wildcard binds; ignored with a warning on non-Linux. |
 | ports.proxyProtocol | list | _empty_ | TCP listener families (any of `dns`, `http`, `https`, `tls`) that must require a HAProxy PROXY protocol header. Enable only when the listener is reachable only through a trusted proxy. |
@@ -145,14 +145,14 @@ All logging options are optional.
 
 ## Init Strategy
 
-A couple of features use an "init/loading strategy" which configures behavior at Blocky startup.
+A couple of features use an "init/loading strategy" which configures behavior at Denyzer startup.
 This applies to all of them. The default strategy is blocking.
 
 | strategy    | Description                                                                                                                                                     |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| blocking    | Initialization happens before DNS resolution starts. Any errors are logged, but Blocky continues running if possible.                                           |
-| failOnError | Like blocking but Blocky will exit with an error if initialization fails.                                                                                       |
-| fast        | Blocky starts serving DNS immediately and initialization happens in the background. The feature requiring initialization will enable later on (if it succeeds). |
+| blocking    | Initialization happens before DNS resolution starts. Any errors are logged, but Denyzer continues running if possible.                                           |
+| failOnError | Like blocking but Denyzer will exit with an error if initialization fails.                                                                                       |
+| fast        | Denyzer starts serving DNS immediately and initialization happens in the background. The feature requiring initialization will enable later on (if it succeeds). |
 
 ## Upstreams configuration
 
@@ -170,7 +170,7 @@ For `init.strategy`, the "init" is testing the given resolvers for each group. T
 
 ### Upstream Groups
 
-To resolve a DNS query, blocky needs external public or private DNS resolvers. Blocky supports DNS resolvers with
+To resolve a DNS query, denyzer needs external public or private DNS resolvers. Denyzer supports DNS resolvers with
 following network protocols (net part of the resolver URL):
 
 - tcp+udp (UDP and TCP, dependent on query type)
@@ -181,7 +181,7 @@ following network protocols (net part of the resolver URL):
 !!! hint
 
     You can (and should!) configure multiple DNS resolvers.
-    Per default blocky uses the `parallel_best` upstream strategy where blocky picks 2 random resolvers from the list for each query and
+    Per default denyzer uses the `parallel_best` upstream strategy where denyzer picks 2 random resolvers from the list for each query and
     returns the answer from the fastest one.
 
 Each resolver must be defined as a string in following format: `[net:]host[:port][/path][#commonName]`.
@@ -201,7 +201,7 @@ DNS endpoint (for example `/dns-query`). It is accepted but ignored for all othe
 
 #### DNS Stamp Format
 
-As an alternative to the traditional format, Blocky supports **DNS Stamps** (`sdns://...`), which encode all connection parameters in a compact, shareable format.
+As an alternative to the traditional format, Denyzer supports **DNS Stamps** (`sdns://...`), which encode all connection parameters in a compact, shareable format.
 
 DNS Stamps are standardized URIs (following IETF draft-denis-dns-stamps) that include protocol, address, hostname, path, and optional certificate hashes in a single string.
 
@@ -241,7 +241,7 @@ upstreams:
 
 **Certificate Pinning:**
 
-DNS stamps can include SHA256 certificate hashes for enhanced security. When present, Blocky automatically validates the server's certificate against these hashes, preventing MITM attacks even if a Certificate Authority is compromised.
+DNS stamps can include SHA256 certificate hashes for enhanced security. When present, Denyzer automatically validates the server's certificate against these hashes, preventing MITM attacks even if a Certificate Authority is compromised.
 
 This is transparent to the user - if a DNS stamp includes certificate hashes, pinning is automatically enabled.
 
@@ -255,7 +255,7 @@ Use the [DNS Stamp Calculator](https://dnscrypt.info/stamps/) to create stamps f
     - DNS stamps with certificate hashes provide additional security through automatic certificate pinning
 
 !!! note
-    Blocky needs at least the configuration of the **default** group with at least one upstream DNS server. This group will be used as a fallback, if no client
+    Denyzer needs at least the configuration of the **default** group with at least one upstream DNS server. This group will be used as a fallback, if no client
     specific resolver configuration is available.
 
     See [List of public DNS servers](additional_information.md#list-of-public-dns-servers) if you need some ideas, which public free DNS server you could use.
@@ -295,7 +295,7 @@ If a client matches multiple client name or CIDR groups, a warning is logged and
 
 ### Upstream connection timeout
 
-Blocky will wait 2 seconds (default value) for the response from the external upstream DNS server. You can change this
+Denyzer will wait 2 seconds (default value) for the response from the external upstream DNS server. You can change this
 value by setting the `timeout` configuration parameter (in **duration format**).
 
 !!! example
@@ -311,19 +311,19 @@ value by setting the `timeout` configuration parameter (in **duration format**).
 
 ### Upstream strategy
 
-Blocky supports different upstream strategies (default `parallel_best`) that determine how and to which upstream DNS servers requests are forwarded.
+Denyzer supports different upstream strategies (default `parallel_best`) that determine how and to which upstream DNS servers requests are forwarded.
 
 Currently available strategies:
 
-- `parallel_best`: blocky picks 2 random (weighted) resolvers from the upstream group for each query and returns the answer from the fastest one.
+- `parallel_best`: denyzer picks 2 random (weighted) resolvers from the upstream group for each query and returns the answer from the fastest one.
   If an upstream failed to answer within the last hour, it is less likely to be chosen for the race.
   This improves your network speed and increases your privacy - your DNS traffic will be distributed over multiple providers.
   (When using 10 upstream servers, each upstream will get on average 20% of the DNS requests)
-- `random`: blocky picks one random (weighted) resolver from the upstream group for each query and if successful, returns its response.
+- `random`: denyzer picks one random (weighted) resolver from the upstream group for each query and if successful, returns its response.
   If the selected resolver fails to respond, a second one is picked to which the query is sent.
   The weighting is identical to the `parallel_best` strategy.
   Although the `random` strategy might be slower than the `parallel_best` strategy, it offers more privacy since each request is sent to a single upstream.
-- `strict`: blocky forwards the request in a strict order. If the first upstream does not respond, the second is asked, and so on.
+- `strict`: denyzer forwards the request in a strict order. If the first upstream does not respond, the second is asked, and so on.
 
 !!! example
 
@@ -349,9 +349,9 @@ It is useful if no system DNS resolver is configured, and/or to encrypt the boot
 
 When using an upstream specified by IP, and not by hostname, you can write only the upstream and skip `ips`.
 
-If `bootstrapDns` is not set, blocky uses the operating system's resolver (`/etc/resolv.conf` on Linux). On systems where the
+If `bootstrapDns` is not set, denyzer uses the operating system's resolver (`/etc/resolv.conf` on Linux). On systems where the
 DHCP-provided resolvers live elsewhere (for example OpenWrt writes them to `/tmp/resolv.conf.auto`), use a `resolvFile` entry to
-point blocky at the right file. The file is parsed once at startup; its `nameserver` entries are used as plain-DNS bootstrap servers.
+point denyzer at the right file. The file is parsed once at startup; its `nameserver` entries are used as plain-DNS bootstrap servers.
 
 !!! note
 
@@ -384,7 +384,7 @@ types, all queries with these types will be dropped (empty answer will be return
 
 This configuration will drop all 'AAAA' (IPv6) queries.
 
-When `AAAA` is filtered, Blocky additionally strips the `ipv6hint` SvcParam from `HTTPS` and `SVCB`
+When `AAAA` is filtered, Denyzer additionally strips the `ipv6hint` SvcParam from `HTTPS` and `SVCB`
 (RFC 9460) answers. Without this, clients could still discover and connect to IPv6 endpoints
 advertised in those records, bypassing the `AAAA` filter. Other SvcParams (e.g. `alpn`, `ipv4hint`)
 are left untouched. Because stripping a hint changes the record, any DNSSEC signature on the
@@ -395,7 +395,7 @@ that response.
 
 In a DNS rebinding attack, an attacker-controlled domain first resolves to a public IP, then
 re-resolves to a private address, letting a victim's browser reach devices on the local network
-under the attacker's origin. When this protection is enabled, blocky drops any answer from the
+under the attacker's origin. When this protection is enabled, denyzer drops any answer from the
 general upstream resolvers that contains a non-public IP address — in `A`/`AAAA` records or in
 `ipv4hint`/`ipv6hint` SvcParams of `HTTPS`/`SVCB` records, in any section of the response
 (answer, authority or additional) — and returns an empty `NOERROR` response instead (visible as
@@ -408,8 +408,7 @@ the offending IP is logged at debug level). Rebinding hits count as **blocked** 
 
     Rebinding hits previously used the `FILTERED` response type. Query log rows written before
     the upgrade keep the old value, so a dashboard grouping by response type shows `FILTERED` and
-    `REBIND` side by side for the retention period. The same applies to Prometheus counters,
-    which are labelled per response type.
+    `REBIND` side by side for the retention period.
 
 The following ranges are considered non-public:
 
@@ -429,7 +428,7 @@ to a private IP via the general upstreams (e.g. a DDNS name pointing into the LA
 is inspected and the entry silently loses its address records — add the CNAME **target** name to
 the allowlist to keep it working. Note that all `upstreams.groups` — **including client-specific
 groups** — count as general upstream resolvers and are inspected; to serve an internal zone from
-an internal resolver, use a conditional mapping instead of a client-keyed group. Lookups blocky
+an internal resolver, use a conditional mapping instead of a client-keyed group. Lookups denyzer
 performs for its own operation (e.g. resolving `blocking.clientGroupsBlock` FQDN client
 identifiers) are exempt from the protection.
 
@@ -457,21 +456,20 @@ must be given in punycode (`xn--…`) form.
 
     The protection runs above the cache: the upstream answer is cached unchanged for its
     regular TTL, and every cache hit is re-inspected, so repeat queries for a blocked domain
-    keep showing `REBIND`. This also covers cache entries synchronized from other instances
-    through [redis](#redis). Answers from trusted local sources (conditional upstreams,
+    keep showing `REBIND`. Answers from trusted local sources (conditional upstreams,
     special-use domains) are never written to the cache, so they cannot resurface as cached
     upstream answers and become subject to inspection.
 
     The protection does not cover NAT64/DNS64 setups: an IPv6 answer embedding a private IPv4
     address under a NAT64 prefix (e.g. `64:ff9b::192.168.1.1`) is not detected, and answers
-    synthesized by blocky's own [DNS64](#dns64) resolver are not inspected at all (the internal
+    synthesized by denyzer's own [DNS64](#dns64) resolver are not inspected at all (the internal
     `A` lookup they are derived from enters the resolver chain below the protection). On
     networks with a NAT64 gateway, DNS rebinding via synthesized IPv6 answers is therefore not
     prevented.
 
 ## Rate limiting per client IP
 
-Blocky can enforce a per-client query rate limit at the head of the resolver chain. **Disabled by default.** This is _not_ a DDoS defense — for that, run [fail2ban](https://www.fail2ban.org/) or [crowdsec](https://www.crowdsec.net/) at the firewall, which can drop traffic before it reaches Blocky. The limiter is intended for misbehaving clients, runaway scripts, and the kind of low-volume amplification that can enroll a public Blocky instance in someone else's DNS reflection attack ([issue #1135](https://github.com/0xERR0R/blocky/issues/1135)).
+Denyzer can enforce a per-client query rate limit at the head of the resolver chain. **Disabled by default.** This is _not_ a DDoS defense — for that, run [fail2ban](https://www.fail2ban.org/) or [crowdsec](https://www.crowdsec.net/) at the firewall, which can drop traffic before it reaches Denyzer. The limiter is intended for misbehaving clients, runaway scripts, and the kind of low-volume amplification that can enroll a public Denyzer instance in someone else's DNS reflection attack ([issue #1135](https://github.com/mia0x75/denyzer/issues/1135)).
 
 When a client exceeds its bucket, the query is **dropped silently** (no UDP response, no DNS error) so that amplification ratio against a spoofed-source attacker is zero. A WARN log line is emitted (throttled to ≤ 1 line per bucket per second) so fail2ban can match against it.
 
@@ -511,7 +509,7 @@ Pick `burst == rate` for a strict steady-state limiter with no spike tolerance. 
 
 ### Sample fail2ban filter
 
-`/etc/fail2ban/filter.d/blocky-ratelimit.conf`:
+`/etc/fail2ban/filter.d/denyzer-ratelimit.conf`:
 
 ```ini
 [Definition]
@@ -521,17 +519,9 @@ ignoreregex =
 
 This filter assumes `logFormat: text` (the default); with `logFormat: json` the field becomes `"client_ip":"<HOST>"` and the regex must be adjusted accordingly.
 
-### Metrics
-
-- `blocky_rate_limit_drops_total{protocol="TCP|UDP"}` — counter, incremented on every drop (label cardinality is bounded).
-- `blocky_rate_limit_cap_exhausted_total` — counter, incremented when a new client is dropped because the in-memory bucket store has reached its hard cap. A non-zero value means the store is under sustained pressure from many distinct clients.
-- `blocky_rate_limit_active_buckets` — gauge, current number of in-memory token buckets.
-
-Per-client IP is intentionally not a Prometheus label; it lives in the log line. Per-IP analysis is better served by log aggregation (Loki, ELK) than by Prometheus.
-
 ## FQDN only
 
-In domain environments, it may be useful to only respond to FQDN requests. If this option is enabled blocky will respond immediately
+In domain environments, it may be useful to only respond to FQDN requests. If this option is enabled denyzer will respond immediately
 with NXDOMAIN if the request is not a valid FQDN. The request is therefore not processed further by other options like custom or conditional.
 Please be aware that by enabling this your resolution will break unless every query is for a fully qualified domain name.
 
@@ -616,14 +606,14 @@ For more complex configurations, you can use the `zone` parameter to define a DN
 The zone file supports standard DNS zone file syntax including:
 - `$ORIGIN` - sets the origin for relative domain names
 - `$TTL` - sets the default TTL for records in the zone
-- `$INCLUDE` - includes another zone file relative to the blocky executable
+- `$INCLUDE` - includes another zone file relative to the denyzer executable
 - `$GENERATE` - generates a range of records
 
 For records defined using the `zone` parameter, the `customTTL` parameter is unused. Instead, the TTL is defined in the zone directly.
 
 ### CNAME Resolution
 
-When a CNAME record is defined and a query matches that record, blocky will:
+When a CNAME record is defined and a query matches that record, denyzer will:
 1. Return the CNAME record in the answer
 2. Additionally resolve the target of the CNAME and include those records in the answer
 3. Protect against CNAME loops (where CNAMEs point to each other in a loop)
@@ -634,11 +624,11 @@ private IP via the general upstreams, add the target name to its allowlist.
 
 ### Reverse DNS
 
-Blocky automatically creates reverse DNS (PTR) records for all defined A and AAAA records. This allows reverse lookups from IP addresses to domain names.
+Denyzer automatically creates reverse DNS (PTR) records for all defined A and AAAA records. This allows reverse lookups from IP addresses to domain names.
 
 ### Filtering Unmapped Types
 
-With `filterUnmappedTypes = true` (default), blocky will filter all queries with unmapped types. For example, if you only define an A record for `printer.lan`, an AAAA query for the same domain will return an empty result.
+With `filterUnmappedTypes = true` (default), denyzer will filter all queries with unmapped types. For example, if you only define an A record for `printer.lan`, an AAAA query for the same domain will return an empty result.
 
 With `filterUnmappedTypes = false`, unmapped type queries will be forwarded to the upstream DNS server. For example, an AAAA query for `printer.lan` (when only an A record is defined) will be sent to the upstream resolver.
 
@@ -687,7 +677,7 @@ One usecase for `fallbackUpstream` is when having split DNS for internal and ext
 
 ## Client name lookup
 
-Blocky can try to resolve a user-friendly client name from the IP address or server URL (DoT and DoH). This is useful
+Denyzer can try to resolve a user-friendly client name from the IP address or server URL (DoT and DoH). This is useful
 for defining of blocking groups, since IP address can change dynamically.
 
 ### Resolving client name from URL/Host
@@ -702,14 +692,14 @@ DoH URL: `https://id-bob.example.com/dns-query` -> request's client name is `bob
 
 For DoH you can also pass the client name as url parameter:
 
-DoH URL: `https://blocky.example.com/dns-query/alice` -> request's client name is `alice`
+DoH URL: `https://denyzer.example.com/dns-query/alice` -> request's client name is `alice`
 
 ### Resolving client name from IP address
 
-Blocky resolves a client's name from its IP address using the first of the following sources that yields a match:
+Denyzer resolves a client's name from its IP address using the first of the following sources that yields a match:
 
 1. **Custom client name mapping** – names defined manually via `clientLookup.clients` (see below).
-2. **Local in-memory sources** – reverse (IP → name) entries already known to Blocky from your
+2. **Local in-memory sources** – reverse (IP → name) entries already known to Denyzer from your
    [custom DNS](#custom-dns) records and [hosts files](#hosts-file). This works automatically, requires no
    `clientLookup.upstream`, and performs no network lookup. For example, a hosts file entry `192.168.1.11 unifi`
    makes the client name of `192.168.1.11` resolve to `unifi`.
@@ -751,7 +741,7 @@ contains a map of client name and multiple IP addresses.
 
 ## Blocking and allowlisting
 
-Blocky can use lists of domains and IPs to block (e.g. advertisement, malware,
+Denyzer can use lists of domains and IPs to block (e.g. advertisement, malware,
 trackers, adult sites). You can group several list sources together and define the blocking behavior per client.
 Blocking uses the [DNS sinkhole](https://en.wikipedia.org/wiki/DNS_sinkhole) approach. For each DNS query, the domain name from
 the request, IP address from the response, and any CNAME records will be checked to determine whether to block the query or not.
@@ -834,14 +824,14 @@ Examples:
 
 In this configuration section, you can define, which blocking group(s) should be used for which client in your network.
 Example: All clients should use the **ads** group, which blocks advertisement and kids devices should use the **adult**
-group, which blocky adult sites.
+group, which denyzer adult sites.
 
 Clients without an explicit group assignment will use the **default** group.
 
 You can use the client name (see [Client name lookup](#client-name-lookup)), client's IP address, client's full-qualified domain name
 or a client subnet as CIDR notation.
 
-If full-qualified domain name is used (for example "myclient.ddns.org"), blocky will try to resolve the IP address (A and AAAA records) of this domain.
+If full-qualified domain name is used (for example "myclient.ddns.org"), denyzer will try to resolve the IP address (A and AAAA records) of this domain.
 If client's IP address matches with the result, the defined group will be used.
 
 !!! example
@@ -955,7 +945,7 @@ address for a domain after receiving the blocked response.
 **For `zeroIP` and custom IP modes:** The TTL is applied to the returned A/AAAA records in the answer section.
 
 **For `nxDomain` mode:** The TTL is applied to the SOA record in the authority section. Per [RFC 2308](https://www.rfc-editor.org/rfc/rfc2308),
-Blocky includes an SOA record in NXDOMAIN responses to enable proper negative caching by stub resolvers.
+Denyzer includes an SOA record in NXDOMAIN responses to enable proper negative caching by stub resolvers.
 The blockTTL value is used for both the SOA's TTL and its MINIMUM field, ensuring clients cache the
 NXDOMAIN response for the configured duration.
 
@@ -977,9 +967,9 @@ See [Sources Loading](#sources-loading).
 ## Caching
 
 Each DNS response has a TTL (Time-to-live) value. This value defines, how long is the record valid in seconds. The
-values are maintained by domain owners, server administrators etc. Blocky caches the answers from all resolved queries
+values are maintained by domain owners, server administrators etc. Denyzer caches the answers from all resolved queries
 in own cache in order to avoid repeated requests. This reduces the DNS traffic and increases the network speed, since
-blocky can serve the result immediately from the cache.
+denyzer can serve the result immediately from the cache.
 
 With following parameters you can tune the caching behavior:
 
@@ -992,7 +982,7 @@ With following parameters you can tune the caching behavior:
 | caching.minTime               | duration format | no        | 0 (use TTL)   | How long a response must be cached (min value). If <=0, use response's TTL, if >0 use this value, if TTL is smaller                                                                                                                                                                                                                                                                                            |
 | caching.maxTime               | duration format | no        | 0 (use TTL)   | How long a response must be cached (max value). If <0, do not cache responses. If 0, use TTL. If > 0, use this value, if TTL is greater                                                                                                                                                                                                                                                                        |
 | caching.maxItemsCount         | int             | no        | 0 (unlimited) | Max number of cache entries (responses) to be kept in cache (soft limit). Default (0): unlimited. Useful on systems with limited amount of RAM.                                                                                                                                                                                                                                                                |
-| caching.prefetching           | bool            | no        | false         | if true, blocky will preload DNS results for often used queries (default: names queried more than 5 times in a 2 hour time window). Results in cache will be loaded again on their expire (TTL). This improves the response time for often used queries, but significantly increases external traffic. It is recommended to increase "minTime" to reduce the number of prefetch queries to external resolvers. |
+| caching.prefetching           | bool            | no        | false         | if true, denyzer will preload DNS results for often used queries (default: names queried more than 5 times in a 2 hour time window). Results in cache will be loaded again on their expire (TTL). This improves the response time for often used queries, but significantly increases external traffic. It is recommended to increase "minTime" to reduce the number of prefetch queries to external resolvers. |
 | caching.prefetchExpires       | duration format | no        | 2h            | Prefetch track time window                                                                                                                                                                                                                                                                                                                                                                                     |
 | caching.prefetchThreshold     | int             | no        | 5             | Name queries threshold for prefetch                                                                                                                                                                                                                                                                                                                                                                            |
 | caching.prefetchMaxItemsCount | int             | no        | 0 (unlimited) | Max number of domains to be kept in cache for prefetching (soft limit). Default (0): unlimited. Useful on systems with limited amount of RAM.                                                                                                                                                                                                                                                                  |
@@ -1005,87 +995,29 @@ With following parameters you can tune the caching behavior:
     caching:
       minTime: 5m
       maxTime: 30m
-      prefetching: true
       exclude:
         - /.*\.lan$/
         - /.*\.local$/
         - /.*\.host\.com\.(jp|fr)$/
     ```
 
-## Redis
+## Loading secrets from files
 
-Blocky can synchronize its cache and blocking state between multiple instances through redis.
-Synchronization is disabled if no address is configured.
+A configuration value can be loaded from a file instead of being written inline. Currently
+`queryLog.target` supports this. Set the value to `file:` followed by an absolute path:
 
-| Parameter                | Type            | Mandatory | Default value | Description                                                         |
-| ------------------------ | --------------- | --------- | ------------- | ------------------------------------------------------------------- |
-| redis.address            | string          | no        |               | Server address and port, a unix socket path (starting with `/`), or master name if sentinel is used |
-| redis.username           | string          | no        |               | Username if necessary                                               |
-| redis.password           | string          | no        |               | Password if necessary (supports `file:` — see tip below)            |
-| redis.database           | int             | no        | 0             | Database                                                            |
-| redis.required           | bool            | no        | false         | Connection is required for blocky to start                          |
-| redis.connectionAttempts | int             | no        | 3             | Max connection attempts                                             |
-| redis.connectionCooldown | duration format | no        | 1s            | Time between the connection attempts                                |
-| redis.sentinelUsername   | string          | no        |               | Sentinel username if necessary                                      |
-| redis.sentinelPassword   | string          | no        |               | Sentinel password if necessary (supports `file:` — see tip below)   |
-| redis.sentinelAddresses  | string[]        | no        |               | Sentinel host list (Sentinel is activated if addresses are defined) |
+```yaml
+queryLog:
+  target: file:/run/secrets/querylog_path
+```
 
-!!! tip "Loading secrets from files"
-
-    Any sensitive value — `redis.password`, `redis.sentinelPassword`, and
-    `queryLog.target` — can be loaded from a file instead of being written
-    inline. Set the value to `file:` followed by an absolute path:
-
-    ```yaml
-    redis:
-      password: file:/run/secrets/redis_password
-    ```
-
-    The file's contents become the value (a single trailing newline is
-    stripped). This suits Docker/Kubernetes secrets and lets you restrict
-    access to each secret with file permissions.
-
-!!! example
-
-    ```yaml
-    redis:
-      address: redismaster
-      username: usrname
-      password: passwd
-      database: 2
-      required: true
-      connectionAttempts: 10
-      connectionCooldown: 3s
-      sentinelUsername: sentUsrname
-      sentinelPassword: sentPasswd
-      sentinelAddresses:
-        - redis-sentinel1:26379
-        - redis-sentinel2:26379
-        - redis-sentinel3:26379
-    ```
-
-## Prometheus
-
-Blocky can expose various metrics for prometheus. To use the prometheus feature, the HTTP listener must be enabled (
-see [Basic Configuration](#basic-configuration)).
-
-| Parameter         | Mandatory | Default value | Description                         |
-| ----------------- | --------- | ------------- | ----------------------------------- |
-| prometheus.enable | no        | false         | If true, enables prometheus metrics |
-| prometheus.path   | no        | /metrics      | URL path to the metrics endpoint    |
-
-!!! example
-
-    ```yaml
-    prometheus:
-      enable: true
-      path: /metrics
-    ```
+The file's contents become the value (a single trailing newline is stripped). This suits
+Docker/Kubernetes secrets and lets you restrict access to each secret with file permissions.
 
 ## Statistics
 
-Blocky can collect in-memory statistics over a rolling 24h window and serve them as JSON at
-`GET /api/stats`, independent of Prometheus. To
+Denyzer can collect in-memory statistics over a rolling 24h window and serve them as JSON at
+`GET /api/stats`. To
 use this feature, the HTTP listener must be enabled (see [Basic Configuration](#basic-configuration)).
 
 The endpoint returns curated totals (`summary`), raw per-type breakdowns (response type, query type
@@ -1113,10 +1045,10 @@ list and cache gauges. Disabled by default; when disabled,
 
 ## HTTP/3 (DoH3) {#http3}
 
-Serve DNS-over-HTTPS over HTTP/3 (RFC 9114). When enabled, Blocky
+Serve DNS-over-HTTPS over HTTP/3 (RFC 9114). When enabled, Denyzer
 listens on UDP at the same addresses as `ports.https` and answers the
 same endpoints as the HTTPS listener (DoH `/dns-query`, REST API,
-Prometheus metrics, web UI).
+web UI).
 
 | Parameter    | Type    | Mandatory | Default value | Description                                                   |
 | ------------ | ------- | --------- | ------------- | ------------------------------------------------------------- |
@@ -1126,7 +1058,7 @@ Prometheus metrics, web UI).
 
 - The HTTP/3 listener uses TLS 1.3 (mandated by RFC 9001). The
   `minTlsServeVersion` config does not affect it.
-- If `http3.enable` is true but `ports.https` is empty, Blocky logs a
+- If `http3.enable` is true but `ports.https` is empty, Denyzer logs a
   warning at startup and does not open any UDP listeners.
 - If `ports.proxyProtocol` includes `https`, HTTP/3 is disabled because
   QUIC/UDP cannot carry a PROXY protocol header.
@@ -1144,74 +1076,65 @@ http3:
 
 ## Query logging
 
-You can enable the logging of DNS queries (question, answer, client, duration etc.) to a daily CSV file (can be opened
-in Excel or OpenOffice Calc) or MySQL/MariaDB database.
+You can enable the logging of DNS queries (question, answer, client, duration etc.) to a local embedded
+[SQLite](https://sqlite.org) database or the console.
 
 !!! warning
 
-    Query file/database contains sensitive information. Please ensure to inform users, if you log their queries.
+    Query database contains sensitive information. Please ensure to inform users, if you log their queries.
 
 ### Query log types
 
 You can select one of following query log types:
 
-- `mysql`: log each query in the external MySQL/MariaDB database
-- `postgresql`: log each query in the external PostgreSQL database
-- `timescale`: log each query in the external Timescale database
-- `sqlite`: log each query in a local SQLite database file (no external DB needed)
-- `csv`: log into CSV file (one per day)
-- `csv-client`: log into CSV file (one per day and per client)
-- `console`: log into console output
-- `dnstap`: export client DNS query/response events via [dnstap](https://dnstap.info/) (Frame Streams over Unix socket or TCP)
+- `sqlite`: log each query in a local embedded SQLite database file (no external database needed). This is the default when `type` is omitted.
+- `console`: log into console output. The dashboard has no data in this mode.
 - `none`: do not log any queries
+
+The dashboard reads the SQLite metrics, so only the `sqlite` type feeds it. Because `sqlite` is the default, a minimal
+configuration only needs `queryLog.target`:
+
+```yaml
+queryLog:
+  target: /var/lib/denyzer/querylog.db
+```
+
+`queryLog.target` is required for the `sqlite` type. If it is left empty, Denyzer falls back to console logging
+instead of creating a database.
 
 #### SQLite query log
 
-The `sqlite` target stores the query log in a single local file (set via `queryLog.target`, e.g. `/var/lib/blocky/querylog.db`) — no external database is required. Blocky creates the file and its parent directory automatically.
+The `sqlite` target stores the query log and the dashboard metrics in a single local SQLite database (set via
+`queryLog.target`, e.g. `/var/lib/denyzer` or `/var/lib/denyzer/denyzer.db`) — no external database is required. Denyzer
+creates the database and its parent directory automatically.
 
-!!! note
-    The `sqlite` target is not available on every platform. It relies on a pure-Go SQLite driver that ships no code for some GOOS/GOARCH combinations, so it is **not** compiled in on:
+`queryLog.target` accepts either a database file path or a directory. When it points at a directory (or ends with a
+path separator), the database is stored as `<directory>/denyzer.db`, which keeps a mounted Docker volume or systemd
+state directory working without naming the file.
 
-    - all MIPS architectures (`mips`, `mipsle`, `mips64`, `mips64le`) and `loong64`
-    - NetBSD other than `netbsd/amd64`, and OpenBSD other than `openbsd/amd64` and `openbsd/arm64`
-    - Solaris and illumos
+Set `queryLog.target` to a **plain filesystem path**. Do **not** prefix it with `file:` — for query-log targets that
+prefix means "read the target value from this file" (see the [secrets tip](#loading-secrets-from-files)), so
+`file:/var/lib/denyzer/querylog.db` would be treated as a file to read the path *from*, not as the database itself.
 
-    Among the official release builds this affects **`linux/mips`, `linux/mipsle`, `linux/mips64`, `linux/mips64le`, `netbsd/arm`, `netbsd/arm64` and `openbsd/arm`**. On those builds, selecting `sqlite` fails at startup with a clear error message — use the `csv`, `mysql`, `postgresql` or `timescale` query log target instead. All other targets (including `linux/amd64`, `linux/arm`, `linux/arm64`, `windows/amd64` and `darwin`) support `sqlite`.
+When running in Docker, mount the **directory** (not just the database file) as a volume so the database persists, and
+include the whole directory in any backup. The database uses WAL mode, so a consistent backup must include
+`denyzer.db`, `denyzer.db-wal` and `denyzer.db-shm` (copy them while Denyzer is stopped, or use
+`VACUUM INTO 'backup.db'`).
 
-Set `queryLog.target` to a **plain filesystem path**. Do **not** prefix it with `file:` — for query-log targets that prefix means "read the target value from this file" (see the [Redis tip](#redis)), so `file:/var/lib/blocky/querylog.db` would be treated as a file to read the path *from*, not as the database itself.
+Retention (`queryLog.retention.historyMonths`) keeps the query history for a number of months. The default is 1 month
+and the supported range is 1 to 12 months. The cleanup removes the query log rows and the short-lived metric buckets
+(minute, hour, and the per-entity daily buckets) that are older than the selected cutoff. The all-time counters and the
+global daily metrics are always preserved, so the totals and the long-term history survive a cleanup.
 
-Blocky opens the database in **WAL (Write-Ahead Logging) mode** automatically; you do not need to configure this. As a result the database is written as three files next to each other: `querylog.db`, `querylog.db-wal` and `querylog.db-shm`. When running in Docker, mount the **directory** (not just the `.db` file) as a volume so all three files persist, and include all three in any backup.
+!!! hint
+    The retention window is also used by the **Purge Logs** button in the dashboard's *Operations* card, which lets you
+    pick the cutoff at runtime.
 
-WAL requires a normal local filesystem. It is **not** supported on network filesystems (NFS, SMB/CIFS); placing the database on a network share can cause lock errors or corruption, so use local/block storage.
-
-Retention (`logRetentionDays`) works the same as for the other database targets: entries older than the limit are deleted. Note that SQLite does not hand freed space back to the operating system on its own, so the `.db` file does not shrink after a deletion — the space is reused for new entries. Run `VACUUM` manually if you need to reclaim disk space.
-
-##### Reading the SQLite query log from external tools
-
-You can read the database with the `sqlite3` CLI, DB Browser for SQLite, a Grafana SQLite data source, or your own script:
-
-- Reading **while Blocky is running** is safe — WAL lets a reader run concurrently with Blocky's writes without blocking. Open the database **read-only** (ideally with a `busy_timeout`) so your tool never interferes with Blocky.
-- Open the **live database file in place**, with the `-wal`/`-shm` sidecar files present. The newest entries may still be in the `-wal` file before they are checkpointed into the main `.db`, so a WAL-aware open is required to see them.
-- **Do not copy only `querylog.db`** for offline reading — you would miss un-checkpointed rows. Instead copy all three files together, run `PRAGMA wal_checkpoint(TRUNCATE);` first, or use `sqlite3 querylog.db ".backup backup.db"` (or `VACUUM INTO`).
-- Use a tool with WAL support (a modern `sqlite3` CLI does).
-
-#### dnstap query log
-
-The `dnstap` target streams structured DNS events to an external collector (e.g. `dnstap-read`, SIEM pipelines). Each resolved client query is sent as a dnstap `CLIENT_RESPONSE` frame containing wire-format query and response messages.
-
-Set `queryLog.target` to:
-
-- `unix:/var/run/dnstap.sock` — Unix domain socket
-- `tcp://127.0.0.1:6000` — TCP listener
-- `/var/run/dnstap.sock` — bare path, treated as Unix socket
-
-`queryLog.fields` and `queryLog.logRetentionDays` do not apply (streaming export, not stored rows/files). `queryLog.flushInterval` controls socket write batching.
-
-!!! note
-    dnstap exports full DNS messages. `log.privacy` obfuscation does not apply to dnstap payloads.
-
-!!! note
-    sustained non-zero values mean export loss.
+The dashboard keeps the 7-day and 30-day Top lists in two internal per-entity rollups inside the same metrics table.
+They are maintained incrementally by the query log writer (once at start-up and then hourly), so no configuration is
+needed. Right after an upgrade from an older database the rollups are rebuilt once by scanning the daily buckets; until
+that one-off rebuild finishes the Top lists fall back to the daily buckets, which is slower but returns the same
+numbers. The rollup rows are never removed by the retention cleanup.
 
 ### Query log fields
 
@@ -1227,52 +1150,38 @@ You can choose which information from processed DNS request and response should 
 - `duration`: request processing time in milliseconds
 
 !!! hint
-    If not defined, blocky will log all available information. The `fields` setting does not apply to the `dnstap` target.
+    If not defined, denyzer will log all available information.
 
 Configuration parameters:
 
 | Parameter                 | Type                                                                                 | Mandatory | Default value | Description                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------ | --------- | ------------- | --------------------------------------------------------------------------------------------- |
-| queryLog.type             | enum (mysql, postgresql, timescale, sqlite, csv, csv-client, console, dnstap, none (see above)) | no        |               | Type of logging target. Console if empty                                                      |
-| queryLog.target           | string                                                                               | no        |               | directory for writing the logs (for csv), database file path (for sqlite), database url (for mysql, postgresql or timescale), or dnstap socket address (`unix:…`, `tcp://…`, or bare `/path`); supports `file:` for database URLs — see [Redis tip](#redis) |
-| queryLog.logRetentionDays | int                                                                                  | no        | 0             | if > 0, deletes log files/database entries which are older than ... days; not used for dnstap   |
+| queryLog.type             | enum (sqlite, console, none (see above))                                             | no        | sqlite        | Type of logging target; `sqlite` when omitted                                                 |
+| queryLog.target           | string                                                                               | no        |               | SQLite database file path, or a directory that stores it as `denyzer.db` (supports `file:` — see [Loading secrets from files](#loading-secrets-from-files)) |
+| queryLog.retention.historyMonths | int                                                                            | no        | 1             | delete the query logs and the short-lived metrics older than N months (1-12); the all-time counters and the global daily metrics are preserved |
 | queryLog.creationAttempts | int                                                                                  | no        | 3             | Max attempts to create specific query log writer                                              |
 | queryLog.creationCooldown | duration format                                                                      | no        | 2s            | Time between the creation attempts                                                            |
-| queryLog.fields           | list enum (clientIP, clientName, responseReason, responseAnswer, question, duration) | no        | all           | which information should be logged; ignored for dnstap                                        |
-| queryLog.flushInterval    | duration format                                                                      | no        | 30s           | Interval to write buffered entries in bulk to the database (mysql/postgresql/timescale/sqlite) or dnstap socket batching |
+| queryLog.fields           | list enum (clientIP, clientName, responseReason, responseAnswer, question, duration) | no        | all           | which information should be logged                                                            |
+| queryLog.flushInterval    | duration format                                                                      | no        | 30s           | Interval to write buffered entries in bulk to the database                                    |
+| queryLog.batchSize        | int                                                                                  | no        | 100           | Max entries buffered before a flush is triggered                                              |
 | queryLog.ignore.sudn      | bool                                                                                 | no        | false         | if true, queries answered as Special Use Domain Names (SUDN) are not logged                   |
 | queryLog.ignore.domains   | list of string                                                                       | no        |               | domains excluded from the query log; each entry is matched against the query name as an exact domain, a `*.wildcard`, or a `/regex/` |
 
 !!! hint
 
-    Please ensure, that the log directory is writable or database exists. If you use docker, please ensure, that the directory is properly
+    Please ensure, that the database directory is writable. If you use docker, please ensure, that the directory is properly
     mounted (e.g. volume)
-
-### Database URLs
-
-To connect to a database, you must provide a URL like value for `target`. The exact format and supported parameters depends on the DB type.
-Parsing is handled not by Blocky, but third-party libraries, therefore the full documentation is external.
-
-| Database   | Full docs                                                                                       | Format                                                                                   | Example                                                              |
-| ---------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| MySQL      | [Go MySQL driver Data Source Name](https://github.com/go-sql-driver/mysql#dsn-data-source-name) | `[username[:password]@][protocol[(host[:port])]]/dbname[?param1=value1[&paramN=valueN]]` | `username:password@tcp(localhost:3306)/blocky_query_log?timeout=15s` |
-| PostgreSQL | [pgx.ParseConfig](https://pkg.go.dev/github.com/jackc/pgx/v5/pgconn#ParseConfig)                | `postgres://[username[:password]@][host[:port]]/dbname[?param1=value1[&paramN=valueN]]`  | `postgres://username@localhost:5432/blocky_query_log`                |
-| Timescale  | See PostgreSQL above                                                                            |                                                                                          |                                                                      |
-
-!!! note
-
-    For increased security, it is recommended to configure the password for a PostgreSQL/Timescale connection via the `PGPASSFILE` environment variable.
 
 ### Examples
 
 !!! example
-**CSV format with limited logging information**
+    **SQLite database with limited logging information**
 
     ```yaml
     queryLog:
-      type: csv
-      target: /logs
-      logRetentionDays: 7
+      target: /var/lib/denyzer/querylog.db
+      retention:
+        historyMonths: 1
       fields:
       - clientIP
       - duration
@@ -1280,34 +1189,11 @@ Parsing is handled not by Blocky, but third-party libraries, therefore the full 
     ```
 
 !!! example
-    **MySQL Database**
-
-    ```yaml
-    queryLog:
-      type: mysql
-      target: 'username:password@tcp(localhost:3306)/blocky_query_log?charset=utf8mb4&parseTime=True&loc=Local&timeout=15s'
-      logRetentionDays: 7
-    ```
-
-!!! example
-    **dnstap export**
-
-    ```yaml
-    queryLog:
-      type: dnstap
-      target: unix:/var/run/dnstap.sock
-      flushInterval: 30s
-      ignore:
-        sudn: true
-    ```
-
-!!! example
     **Ignore noisy domains**
 
     ```yaml
     queryLog:
-      type: postgresql
-      target: postgres://user:password@db:5432/blocky_query_log
+      target: /var/lib/denyzer/querylog.db
       ignore:
         sudn: true
         domains:
@@ -1392,7 +1278,7 @@ Warning! You should only disable this if your upstream DNS server is local, as i
 This also covers [RFC 9462 (Discovery of Designated Resolvers)](https://www.rfc-editor.org/rfc/rfc9462): queries
 for any name in `resolver.arpa.` (e.g. `_dns.resolver.arpa.`) are answered locally with NODATA and never
 forwarded upstream. Without this, stub resolvers (notably recent iOS/Android) can pick up a DDR answer from the
-upstream and silently upgrade to that upstream, bypassing blocky.
+upstream and silently upgrade to that upstream, bypassing denyzer.
 
 Configuration parameters:
 
@@ -1417,11 +1303,11 @@ Configuration parameters:
 
 ## DNSSEC validation
 
-DNSSEC (Domain Name System Security Extensions) provides cryptographic authentication of DNS data to protect against cache poisoning, man-in-the-middle attacks, and DNS spoofing. When enabled, Blocky validates DNSSEC signatures on DNS responses and ensures the chain of trust from the root zone to the queried domain.
+DNSSEC (Domain Name System Security Extensions) provides cryptographic authentication of DNS data to protect against cache poisoning, man-in-the-middle attacks, and DNS spoofing. When enabled, Denyzer validates DNSSEC signatures on DNS responses and ensures the chain of trust from the root zone to the queried domain.
 
 ### Overview
 
-When DNSSEC validation is enabled, Blocky will:
+When DNSSEC validation is enabled, Denyzer will:
 
 - Set the DNSSEC OK (DO) bit on all upstream queries to request DNSSEC records
 - Validate cryptographic signatures (RRSIG records) in DNS responses
@@ -1432,7 +1318,7 @@ When DNSSEC validation is enabled, Blocky will:
 - Set the Authenticated Data (AD) flag only after successful validation
 - Add Extended DNS Error (EDE) codes per RFC 8914 when validation fails
 
-Independently of this setting, Blocky normalizes every response against the DNSSEC-related bits of the query it answers, because the client's DO bit is not necessarily the one used towards the upstream:
+Independently of this setting, Denyzer normalizes every response against the DNSSEC-related bits of the query it answers, because the client's DO bit is not necessarily the one used towards the upstream:
 
 - The DNSSEC records (RRSIG, DNSKEY, DS, NSEC, NSEC3) are stripped from the response of a client that did not set the DO bit, unless that client explicitly queried for one of those types or sent an ANY query (RFC 4035 §3.2.1, RFC 3225 §3). Validation is unaffected: the DO bit is still set towards the upstream
 - The DO bit of the query is copied into the response (RFC 3225 §3)
@@ -1440,7 +1326,7 @@ Independently of this setting, Blocky normalizes every response against the DNSS
 
 ### RFC Compliance
 
-Blocky's DNSSEC implementation complies with the following RFCs:
+Denyzer's DNSSEC implementation complies with the following RFCs:
 
 - **RFC 4033/4034/4035** (DNSSEC core specifications): Fully implemented
 - **RFC 5155** (NSEC3): Implemented with configurable iteration limits
@@ -1471,7 +1357,7 @@ DNSSEC validation protects against:
 
 ### DoS Protection
 
-DNSSEC validation can be computationally expensive and requires additional DNS queries. Blocky includes several protections against DoS attacks:
+DNSSEC validation can be computationally expensive and requires additional DNS queries. Denyzer includes several protections against DoS attacks:
 
 - **maxChainDepth**: Limits validation depth for deeply nested domains (e.g., prevents validation of `a.b.c.d.e.f.g.h.i.j.example.com`)
 - **maxUpstreamQueries**: Limits the number of upstream queries (DNSKEY/DS lookups) per validation to prevent query amplification
@@ -1480,7 +1366,7 @@ DNSSEC validation can be computationally expensive and requires additional DNS q
 
 ### Clock Skew Tolerance
 
-DNSSEC signatures have inception and expiration timestamps. Blocky validates that the current time falls within this validity window. However, in real-world deployments, system clocks may not be perfectly synchronized, which can cause valid signatures to be rejected.
+DNSSEC signatures have inception and expiration timestamps. Denyzer validates that the current time falls within this validity window. However, in real-world deployments, system clocks may not be perfectly synchronized, which can cause valid signatures to be rejected.
 
 The `clockSkewToleranceSec` parameter (default: 3600 seconds = 1 hour) allows validation to succeed even if the system clock is off by the specified amount. This matches the behavior of industry-standard validators like Unbound and BIND.
 
@@ -1503,7 +1389,7 @@ The `clockSkewToleranceSec` parameter (default: 3600 seconds = 1 hour) allows va
 
 ### Validation Results
 
-Blocky classifies DNSSEC validation results into four categories:
+Denyzer classifies DNSSEC validation results into four categories:
 
 | Result          | Description                                                          | Response Handling                        |
 | --------------- | -------------------------------------------------------------------- | ---------------------------------------- |
@@ -1512,9 +1398,9 @@ Blocky classifies DNSSEC validation results into four categories:
 | **Bogus**       | Invalid DNSSEC signatures or broken chain of trust                   | SERVFAIL returned with EDE code `6 (DNSSEC Bogus)`, response type `BOGUS` |
 | **Indeterminate** | Validation could not be completed (e.g., network errors, budget exceeded) | AD flag cleared, response returned |
 
-A `BOGUS` result means blocky could not obtain a trustworthy answer, so it counts as an **error**
+A `BOGUS` result means denyzer could not obtain a trustworthy answer, so it counts as an **error**
 in the [statistics](#statistics) — not as a block. A domain whose operator has misconfigured DNSSEC
-is not something blocky blocked, and never appears in `topBlockedDomains`.
+is not something denyzer blocked, and never appears in `topBlockedDomains`.
 
 !!! note "Upgrading"
 
@@ -1525,7 +1411,7 @@ is not something blocky blocked, and never appears in `topBlockedDomains`.
 
 ### Trust Anchors
 
-By default, Blocky uses the latest IANA root trust anchors (KSK-2017 and KSK-2024) for DNSSEC validation. These are the same trust anchors used by major DNS resolvers and are embedded in the Blocky binary.
+By default, Denyzer uses the latest IANA root trust anchors (KSK-2017 and KSK-2024) for DNSSEC validation. These are the same trust anchors used by major DNS resolvers and are embedded in the Denyzer binary.
 
 #### Custom Trust Anchors
 
@@ -1545,7 +1431,7 @@ Trust anchors can be specified in two formats:
 
 ### Supported Algorithms
 
-Blocky supports the following DNSSEC algorithms per RFC 8624:
+Denyzer supports the following DNSSEC algorithms per RFC 8624:
 
 | Algorithm | ID | Status | Security Level |
 | --------- | -- | ------ | -------------- |
@@ -1557,7 +1443,7 @@ Blocky supports the following DNSSEC algorithms per RFC 8624:
 | ED25519   | 15 | Recommended | Very Strong |
 | ED448     | 16 | Recommended | Strongest |
 
-Blocky automatically selects the strongest available algorithm when multiple signatures are present, providing protection against algorithm downgrade attacks per RFC 6840 §5.11.
+Denyzer automatically selects the strongest available algorithm when multiple signatures are present, providing protection against algorithm downgrade attacks per RFC 6840 §5.11.
 
 ### Performance Considerations
 
@@ -1570,8 +1456,6 @@ DNSSEC validation adds overhead to DNS resolution:
 Recommendations:
 
 - Start with `cacheExpirationHours: 1` and increase if validation overhead is acceptable
-- Monitor upstream query count with the `maxUpstreamQueries` metric
-- Use `prefetching` in the caching resolver to pre-validate popular domains
 - Consider disabling for high-volume recursive resolvers if performance is critical
 
 ### Examples
@@ -1583,7 +1467,7 @@ Recommendations:
       validate: true
     ```
 
-    This enables DNSSEC validation with all default settings. Blocky will validate all DNSSEC-signed domains using the built-in root trust anchors.
+    This enables DNSSEC validation with all default settings. Denyzer will validate all DNSSEC-signed domains using the built-in root trust anchors.
 
 !!! example "DNSSEC validation with custom DoS protection"
 
@@ -1633,14 +1517,6 @@ Recommendations:
 
     Enable debug logging to see detailed DNSSEC validation information for troubleshooting.
 
-### Monitoring
-
-Blocky exposes Prometheus metrics for DNSSEC validation:
-
-- `blocky_dnssec_validation_total{result="secure|insecure|bogus|indeterminate"}`: Total validations by result
-- `blocky_dnssec_cache_hits_total`: Number of validation cache hits
-- `blocky_dnssec_validation_duration_seconds{result="..."}`: Validation duration histogram
-
 ### Troubleshooting
 
 **Problem**: All DNSSEC-signed domains return SERVFAIL
@@ -1680,7 +1556,7 @@ DNS64 (RFC 6147) enables IPv6-only clients to access IPv4-only services by synth
 
 ### Overview
 
-When DNS64 is enabled, Blocky will:
+When DNS64 is enabled, Denyzer will:
 
 - Intercept AAAA queries and check if native IPv6 records exist
 - If no native AAAA records are found, query for A records
@@ -1695,7 +1571,7 @@ When DNS64 is enabled, Blocky will:
 
 ### RFC Compliance
 
-Blocky's DNS64 implementation complies with:
+Denyzer's DNS64 implementation complies with:
 
 - **RFC 6147** (DNS64 specification): Non-validating mode implementation
 - **RFC 6052** (IPv4-to-IPv6 address embedding): All six prefix lengths supported (/32, /40, /48, /56, /64, /96)
@@ -1727,7 +1603,7 @@ DNS64 uses IPv6 prefixes to embed IPv4 addresses. RFC 6052 defines six valid pre
 **Multiple prefixes**: You can configure multiple prefixes for load balancing across multiple NAT64 gateways. DNS64 will synthesize one AAAA record per prefix per A record.
 
 !!! warning "Prefix Overlap Validation"
-    Blocky validates that configured prefixes do not overlap. Overlapping prefixes will cause startup failure.
+    Denyzer validates that configured prefixes do not overlap. Overlapping prefixes will cause startup failure.
 
 ### Exclusion Set
 
@@ -1735,7 +1611,7 @@ DNS64 will **not** synthesize AAAA records if the response already contains AAAA
 
 #### Default Exclusion Set (Recommended)
 
-If `dns64.exclusionSet` is not configured, Blocky uses the default exclusion set:
+If `dns64.exclusionSet` is not configured, Denyzer uses the default exclusion set:
 
 - **IPv4-mapped IPv6 addresses** (`::ffff:0:0/96`) - RFC 6147 requirement
 - **Loopback address** (`::1/128`) - RFC 6147 recommendation
@@ -1809,13 +1685,13 @@ DNS64 adds overhead to DNS resolution:
 - **Cache hit rate**: With caching, most AAAA queries hit the cache and avoid synthesis overhead
 
 !!! warning "Enable Caching for DNS64"
-    DNS64 without caching will **double** upstream query load (one AAAA + one A per query). Blocky will log a warning if DNS64 is enabled without caching.
+    DNS64 without caching will **double** upstream query load (one AAAA + one A per query). Denyzer will log a warning if DNS64 is enabled without caching.
 
 ## Healthcheck
 
-Blocky responds to a dedicated `healthcheck.blocky` DNS query that is
+Denyzer responds to a dedicated `healthcheck.denyzer` DNS query that is
 designed for container liveness probes. The handler is registered on
-the DNS listeners created by Blocky (UDP, TCP, DoT) and responds to any
+the DNS listeners created by Denyzer (UDP, TCP, DoT) and responds to any
 query type with `NOERROR` and an empty answer section. It does **not**
 go through the resolver chain, so it stays cheap and is unaffected by
 upstream health.
@@ -1823,7 +1699,7 @@ upstream health.
 !!! example
 
     ```sh
-    dig @<blocky-host> -p <dns-port> healthcheck.blocky A +short
+    dig @<denyzer-host> -p <dns-port> healthcheck.denyzer A +short
     ```
 
     Returns no answer records but `status: NOERROR` — probes should
@@ -1836,7 +1712,7 @@ upstream health.
 
     ```yaml
     healthcheck:
-      test: ["CMD", "dig", "@127.0.0.1", "-p", "53", "healthcheck.blocky", "+short", "+tries=1"]
+      test: ["CMD", "dig", "@127.0.0.1", "-p", "53", "healthcheck.denyzer", "+short", "+tries=1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -1844,7 +1720,7 @@ upstream health.
 
 ## SSL certificate configuration (DoH / TLS listener)
 
-See [Wiki - Configuration of HTTPS](https://github.com/0xERR0R/blocky/wiki/Configuration-of-HTTPS-for-DoH-and-Rest-API)
+See [Wiki - Configuration of HTTPS](https://github.com/mia0x75/denyzer/wiki/Configuration-of-HTTPS-for-DoH-and-Rest-API)
 for detailed information, how to create and configure SSL certificates.
 
 DoH url: `https://host:port/dns-query`
@@ -1866,9 +1742,9 @@ The supported source types are:
 !!! example
 
     ```yaml
-    - https://example.com/a/source # blocky will download and parse the file
-    - /a/file/path # blocky will read the local file
-    - | # blocky will parse the content of this multi-line string
+    - https://example.com/a/source # denyzer will download and parse the file
+    - /a/file/path # denyzer will read the local file
+    - | # denyzer will parse the content of this multi-line string
       # inline configuration
     ```
 
@@ -1891,7 +1767,7 @@ These settings apply only to the resolver under which they are nested.
 
 #### Refresh / Reload
 
-To keep source contents up-to-date, blocky can periodically refresh and reparse them. Default period is
+To keep source contents up-to-date, denyzer can periodically refresh and reparse them. Default period is
 **4 hours**. You can configure this by setting the `refreshPeriod` parameter to a value in **duration format**.
 A value of zero or less will disable this feature.
 
@@ -1918,24 +1794,24 @@ Configures how HTTP(S) sources are downloaded:
 | cooldown     | duration | no        | 500ms         | Time between the download attempts             |
 | cachePath    | path     | no        | (empty)       | Directory for an on-disk cache of downloaded sources (see below) |
 
-`cachePath` (default: empty): directory for an on-disk cache of downloaded sources. When set, blocky sends HTTP
+`cachePath` (default: empty): directory for an on-disk cache of downloaded sources. When set, denyzer sends HTTP
 conditional requests (`If-None-Match` / `If-Modified-Since`) and skips re-downloading unchanged lists, serves a source
 from disk when its host is temporarily unreachable, and — with `loading.strategy: fast` — seeds lists from disk on
 startup so it can answer queries immediately. Validators are kept in memory and reset on restart, so the first refresh
 after a restart re-downloads each source. When unset, downloads are fully stateless (nothing is written to disk).
 Mount this directory on a persistent volume in containerized setups.
-Note: when you remove or change a source URL, its previous cache file is left on disk — blocky does not delete orphaned cache files automatically. They are harmless and bounded; clear the cache directory manually if you want to reclaim the space.
+Note: when you remove or change a source URL, its previous cache file is left on disk — denyzer does not delete orphaned cache files automatically. They are harmless and bounded; clear the cache directory manually if you want to reclaim the space.
 
-!!! warning "The directory must be writable by blocky"
+!!! warning "The directory must be writable by denyzer"
 
-    If blocky cannot write to `cachePath`, it logs
+    If denyzer cannot write to `cachePath`, it logs
     `cannot create temp cache file in <path>, serving without caching` and keeps
     resolving normally — only the on-disk cache is disabled, so this degrades
     performance rather than breaking DNS.
 
-    In Docker, blocky runs as **UID 100**. Use the pre-created `/app/cache` directory
+    In Docker, denyzer runs as **UID 100**. Use the pre-created `/app/cache` directory
     with a named volume, or make your own path writable by UID 100. See
-    [writable mounts and file permissions](installation.md#run-blocky).
+    [writable mounts and file permissions](installation.md#run-denyzer).
 
 !!! example
 
@@ -1945,11 +1821,11 @@ Note: when you remove or change a source URL, its previous cache file is left on
         timeout: 4m
         attempts: 5
         cooldown: 10s
-        cachePath: /var/cache/blocky/lists
+        cachePath: /var/cache/denyzer/lists
     ```
 
     In a container, prefer the pre-created cache directory and mount a named volume
-    over it (`-v blocky_cache:/app/cache`):
+    over it (`-v denyzer_cache:/app/cache`):
 
     ```yaml
     loading:
@@ -1983,7 +1859,7 @@ A value of -1 disables the limit.
 
 ### Concurrency
 
-Blocky downloads and processes sources concurrently. This allows limiting how many can be processed in the same time.
+Denyzer downloads and processes sources concurrently. This allows limiting how many can be processed in the same time.
 Larger values can reduce the overall list refresh time at the cost of using more RAM. Please consider reducing this value on systems with limited memory.
 Default value is 4.
 

@@ -15,9 +15,9 @@ const capDropDNSPort = 1053
 
 var _ = Describe("Restricted capabilities", Label("e2e"), func() {
 	var (
-		e2eNet *testcontainers.DockerNetwork
-		blocky testcontainers.Container
-		err    error
+		e2eNet  *testcontainers.DockerNetwork
+		denyzer testcontainers.Container
+		err     error
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -29,7 +29,7 @@ var _ = Describe("Restricted capabilities", Label("e2e"), func() {
 
 	Context("with all capabilities dropped on a high port", func() {
 		BeforeEach(func(ctx context.Context) {
-			blocky, err = createBlockyContainerWithCapDrop(ctx, e2eNet, capDropDNSPort, dedent(fmt.Sprintf(`
+			denyzer, err = createDenyzerContainerWithCapDrop(ctx, e2eNet, capDropDNSPort, dedent(fmt.Sprintf(`
 				upstreams:
 				  groups:
 				    default:
@@ -41,8 +41,8 @@ var _ = Describe("Restricted capabilities", Label("e2e"), func() {
 		})
 
 		It("execs and serves DNS without NET_BIND_SERVICE", func(ctx context.Context) {
-			Expect(blocky.IsRunning()).Should(BeTrue())
-			Expect(getContainerLogs(ctx, blocky)).
+			Expect(denyzer.IsRunning()).Should(BeTrue())
+			Expect(getContainerLogs(ctx, denyzer)).
 				ShouldNot(ContainElement(ContainSubstring("operation not permitted")))
 		})
 	})

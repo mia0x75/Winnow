@@ -1,9 +1,9 @@
-# Mockery v3 configuration for blocky
+# Mockery v3 configuration for denyzer
 # Run: make generate  OR  go tool mockery
 
 packages:
   # API package
-  github.com/0xERR0R/blocky/api:
+  github.com/mia0x75/denyzer/api:
     config:
       all: true
       inpackage: true
@@ -11,7 +11,7 @@ packages:
 
   # Cache package - ExpiringCache interface
   # Note: Using non-test filename (mocks.go) to allow cross-package access from resolver tests
-  github.com/0xERR0R/blocky/cache:
+  github.com/mia0x75/denyzer/cache:
     interfaces:
       ExpiringCache:
         config:
@@ -20,7 +20,7 @@ packages:
 
 
   # Lists package - FileDownloader interface
-  github.com/0xERR0R/blocky/lists:
+  github.com/mia0x75/denyzer/lists:
     interfaces:
       FileDownloader:
         config:
@@ -29,7 +29,7 @@ packages:
 
   # Resolver package - ChainedResolver interface
   # Note: Using non-test filename (mocks.go) to allow cross-package access from server tests
-  github.com/0xERR0R/blocky/resolver:
+  github.com/mia0x75/denyzer/resolver:
     interfaces:
       ChainedResolver:
         config:

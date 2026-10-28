@@ -7,13 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xERR0R/blocky/cache"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/cache"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
 
-	expirationcache "github.com/0xERR0R/expiration-cache"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 )
@@ -55,9 +54,9 @@ func NewClientNamesResolver(ctx context.Context,
 		configurable: withConfig(&cfg),
 		typed:        withType("client_names"),
 
-		cache: expirationcache.NewCache[[]string](ctx, expirationcache.Options{
+		cache: cache.NewCache[[]string](cache.Options{
 			CleanupInterval: time.Hour,
-			Shards:          cache.ShardCount(),
+			MaxSize:         defaultCacheSize,
 		}),
 		externalResolver: r,
 		reverseLookupers: localReverseLookupers,

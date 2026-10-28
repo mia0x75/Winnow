@@ -11,16 +11,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/0xERR0R/blocky/cache/stringcache"
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/lists/parsers"
-	"github.com/0xERR0R/blocky/log"
 	"github.com/google/uuid"
+	"github.com/mia0x75/denyzer/cache/stringcache"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/lists/parsers"
+	"github.com/mia0x75/denyzer/log"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
-	. "github.com/0xERR0R/blocky/helpertest"
+	. "github.com/mia0x75/denyzer/helpertest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -593,7 +593,7 @@ func mockListSource() config.BytesSource {
 }
 
 func createTestListFile(dir string, totalLines int) (string, int) {
-	file, err := os.CreateTemp(dir, "blocky")
+	file, err := os.CreateTemp(dir, "denyzer")
 	if err != nil {
 		log.Log().Fatal(err)
 	}

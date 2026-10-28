@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/lists"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/stats"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/lists"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/stats"
 
-	. "github.com/0xERR0R/blocky/helpertest"
-	. "github.com/0xERR0R/blocky/model"
+	. "github.com/mia0x75/denyzer/helpertest"
+	. "github.com/mia0x75/denyzer/model"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"

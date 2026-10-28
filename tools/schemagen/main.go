@@ -1,4 +1,4 @@
-// Command schemagen generates docs/config.schema.json from the blocky config
+// Command schemagen generates docs/config.schema.json from the denyzer config
 // structs. Run via `go generate ./config/...` (cwd: ./config).
 package main
 
@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"github.com/0xERR0R/blocky/config"
 	"github.com/invopop/jsonschema"
+	"github.com/mia0x75/denyzer/config"
 )
 
 const (
@@ -32,7 +32,7 @@ func run() error {
 		// AllowAdditionalProperties stays false => additionalProperties:false,
 		// matching yaml.UnmarshalStrict's unknown-key rejection.
 		// RequiredFromJSONSchemaTags=true makes only `jsonschema:"required"`
-		// fields required; blocky tags none, so nothing is required (a config
+		// fields required; denyzer tags none, so nothing is required (a config
 		// with all defaults is valid). The default would require every field.
 		RequiredFromJSONSchemaTags: true,
 		// DoNotReference inlines the whole tree so the defaults/deprecated
@@ -42,7 +42,7 @@ func run() error {
 	r.Mapper = makeMapper()
 
 	// Doc comments -> descriptions. cwd is ./config at generate time.
-	if err := r.AddGoComments("github.com/0xERR0R/blocky/config", "."); err != nil {
+	if err := r.AddGoComments("github.com/mia0x75/denyzer/config", "."); err != nil {
 		return fmt.Errorf("add go comments: %w", err)
 	}
 

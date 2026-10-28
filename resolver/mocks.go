@@ -7,7 +7,7 @@ package resolver
 import (
 	"context"
 
-	"github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/model"
 	"github.com/sirupsen/logrus"
 	mock "github.com/stretchr/testify/mock"
 )

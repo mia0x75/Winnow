@@ -4,21 +4,19 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"html/template"
 	"io"
 	"net"
 	"net/http"
 
-	"github.com/0xERR0R/blocky/metrics"
-	"github.com/0xERR0R/blocky/resolver"
+	"github.com/mia0x75/denyzer/resolver"
 
-	"github.com/0xERR0R/blocky/api"
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/docs"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/util"
-	"github.com/0xERR0R/blocky/web"
+	"github.com/mia0x75/denyzer/api"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/docs"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/util"
+	"github.com/mia0x75/denyzer/web"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -62,6 +60,17 @@ func (s *Server) createOpenAPIInterfaceImpl() (impl api.StrictServerInterface, e
 	}
 
 	return api.NewOpenAPIInterfaceImpl(bControl, s, refresher, cacheControl, statsProvider), nil
+}
+
+// cacheEntryCount reports the current size of the in-memory result cache
+// (0 when no caching resolver is present in the chain).
+func (s *Server) cacheEntryCount() int {
+	caching, err := resolver.GetFromChainWithType[*resolver.CachingResolver](s.queryResolver)
+	if err != nil {
+		return 0
+	}
+
+	return caching.EntryCount()
 }
 
 func (s *Server) registerDoHEndpoints(router *chi.Mux, cfg *config.Config) {
@@ -192,10 +201,29 @@ func (s *Server) Query(
 	return s.resolve(ctx, req)
 }
 
-func createHTTPRouter(cfg *config.Config, openAPIImpl api.StrictServerInterface) *chi.Mux {
+func createHTTPRouter(
+	openAPIImpl api.StrictServerInterface,
+	listCounts listCountsProvider,
+	cacheEntryCount func() int,
+) *chi.Mux {
 	router := chi.NewRouter()
 
 	api.RegisterOpenAPIEndpoints(router, openAPIImpl)
+
+	// SQLite JSON API endpoints for the denyzer-ui dashboard.
+	router.Get("/api/stats/summary", func(w http.ResponseWriter, r *http.Request) {
+		handleStatsSummary(w, r, cacheEntryCount)
+	})
+	router.Get("/api/stats/hourly_trend", handleHourlyTrend)
+	router.Get("/api/stats/top_domains", handleTopDomains)
+	router.Get("/api/stats/top_clients", handleTopClients)
+	router.Get("/api/stats/search_domains", handleSearchDomains)
+	router.Get("/api/stats/search_clients", handleSearchClients)
+	router.Get("/api/stats/query_types", handleQueryTypesBreakdown)
+	router.Get("/api/logs/query", handleQueryLogs)
+	router.Post("/api/stats/refresh", handleRefreshStats)
+	router.Post("/api/stats/cleanup", handleCleanupHistory)
+	registerStatsListsHandler(router, listCounts)
 
 	configureDebugHandler(router)
 
@@ -203,11 +231,11 @@ func createHTTPRouter(cfg *config.Config, openAPIImpl api.StrictServerInterface)
 
 	configureStaticAssetsHandler(router)
 
-	configureRootHandler(cfg, router)
+	configureDashboardHandler(router)
+
+	configureRootHandler(router)
 
 	configureRobotsHandler(router)
-
-	metrics.Start(router, cfg.Prometheus)
 
 	return router
 }
@@ -234,63 +262,25 @@ func configureStaticAssetsHandler(router *chi.Mux) {
 	router.Handle("/static/*", http.StripPrefix("/static/", fs))
 }
 
+func configureDashboardHandler(router *chi.Mux) {
+	fsys, err := web.DashboardFS()
+	util.FatalOnError("unable to load embedded dashboard files", err)
+
+	dashboardFS := http.FileServer(http.FS(fsys))
+
+	router.Get("/dashboard", func(writer http.ResponseWriter, request *http.Request) {
+		http.Redirect(writer, request, "/dashboard/", http.StatusMovedPermanently)
+	})
+	router.Handle("/dashboard/*", http.StripPrefix("/dashboard", dashboardFS))
+}
+
 func configureRobotsHandler(router *chi.Mux) {
 	router.Handle("/robots.txt", http.FileServer(http.FS(web.WebFs)))
 }
 
-func configureRootHandler(cfg *config.Config, router *chi.Mux) {
+func configureRootHandler(router *chi.Mux) {
 	router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set(contentTypeHeader, htmlContentType)
-
-		t := template.New("index")
-
-		_, _ = t.Parse(web.IndexTmpl)
-
-		type HandlerLink struct {
-			URL   string
-			Title string
-		}
-
-		type PageData struct {
-			Links     []HandlerLink
-			Version   string
-			BuildTime string
-		}
-
-		pd := PageData{
-			Links:     nil,
-			Version:   util.Version,
-			BuildTime: util.BuildTime,
-		}
-
-		pd.Links = []HandlerLink{
-			{
-				URL:   "/docs/openapi.yaml",
-				Title: "Rest API Documentation (OpenAPI)",
-			},
-			{
-				URL:   "/static/rapidoc.html",
-				Title: "Interactive Rest API Documentation (RapiDoc)",
-			},
-			{
-				URL:   "/docs/config.schema.json",
-				Title: "Configuration JSON Schema",
-			},
-			{
-				URL:   "/debug/",
-				Title: "Go Profiler",
-			},
-		}
-
-		if cfg.Prometheus.Enable {
-			pd.Links = append(pd.Links, HandlerLink{
-				URL:   cfg.Prometheus.Path,
-				Title: "Prometheus endpoint",
-			})
-		}
-
-		err := t.Execute(writer, pd)
-		logAndResponseWithError(err, "can't write index template: ", writer)
+		http.Redirect(writer, request, "/dashboard/", http.StatusMovedPermanently)
 	})
 }
 
@@ -303,4 +293,23 @@ func logAndResponseWithError(err error, message string, writer http.ResponseWrit
 
 func configureDebugHandler(router *chi.Mux) {
 	router.Mount("/debug", middleware.Profiler())
+}
+
+// listCountsProvider exposes the current per-group blocklist entry counts.
+type listCountsProvider interface {
+	ListCounts() (denylist, allowlist map[string]int)
+}
+
+// registerStatsListsHandler registers GET /api/stats/lists when a provider is
+// available in the resolver chain.
+func registerStatsListsHandler(router *chi.Mux, provider listCountsProvider) {
+	if provider == nil {
+		log.Log().Debug("no blocklist counts provider in resolver chain, /api/stats/lists will be unavailable")
+
+		return
+	}
+
+	router.Get("/api/stats/lists", func(writer http.ResponseWriter, request *http.Request) {
+		handleStatsListed(writer, provider)
+	})
 }

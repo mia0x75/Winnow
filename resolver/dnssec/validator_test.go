@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/model"
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -545,7 +545,7 @@ var _ = Describe("DNSSECValidator", func() {
 		})
 
 		It("sets the CheckingDisabled bit on DS/DNSKEY sub-queries so it validates raw records", func() {
-			// blocky must validate independently (issue #1287): a validating upstream would
+			// denyzer must validate independently (issue #1287): a validating upstream would
 			// otherwise SERVFAIL a bogus chain (e.g. dnssec-failed.org) before we ever see the
 			// raw DS/DNSKEY, and that SERVFAIL is indistinguishable from an unreachable upstream -
 			// so it would be served as Indeterminate instead of rejected as Bogus. The CD bit
@@ -3742,7 +3742,7 @@ var _ = Describe("Additional Validator Coverage", func() {
 		})
 
 		// Test for issue #1926: CNAME in unsigned zone without RRSIG should not cause Bogus
-		// This reproduces the bug where Blocky incorrectly rejected unsigned CNAMEs as "bogus signatures"
+		// This reproduces the bug where Denyzer incorrectly rejected unsigned CNAMEs as "bogus signatures"
 		It("should accept CNAME in unsigned zone without RRSIG (issue #1926)", func() {
 			// Simulate the push.bitdefender.net scenario:
 			// 1. push.bitdefender.net (unsigned zone) -> CNAME with no RRSIG

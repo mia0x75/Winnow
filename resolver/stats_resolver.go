@@ -8,12 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/evt"
-	"github.com/0xERR0R/blocky/lists"
-	"github.com/0xERR0R/blocky/model"
-	"github.com/0xERR0R/blocky/stats"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/evt"
+	"github.com/mia0x75/denyzer/lists"
+	"github.com/mia0x75/denyzer/model"
+	"github.com/mia0x75/denyzer/stats"
+	"github.com/mia0x75/denyzer/util"
 
 	"github.com/miekg/dns"
 )

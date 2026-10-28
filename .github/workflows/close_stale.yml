@@ -10,7 +10,7 @@ concurrency:
 jobs:
   stale:
     runs-on: ubuntu-latest
-    if: github.repository_owner == '0xERR0R'
+    if: github.repository_owner == 'mia0x75'
     permissions:
       issues: write
       pull-requests: write

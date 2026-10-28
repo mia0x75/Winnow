@@ -7,12 +7,12 @@ import (
 	"math"
 	"strings"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/log"
-	"github.com/0xERR0R/blocky/util"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/log"
+	"github.com/mia0x75/denyzer/util"
 
-	. "github.com/0xERR0R/blocky/model"
+	. "github.com/mia0x75/denyzer/model"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"

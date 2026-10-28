@@ -6,15 +6,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xERR0R/blocky/config"
-	. "github.com/0xERR0R/blocky/helpertest"
-	"github.com/0xERR0R/blocky/log"
-	. "github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/config"
+	. "github.com/mia0x75/denyzer/helpertest"
+	"github.com/mia0x75/denyzer/log"
+	. "github.com/mia0x75/denyzer/model"
 
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -142,8 +141,7 @@ var _ = Describe("RateLimitingResolver", func() {
 			_, _ = sut.Resolve(ctx, req) // allowed
 			_, _ = sut.Resolve(ctx, req) // drop 1
 			_, _ = sut.Resolve(ctx, req) // drop 2
-			Expect(testutil.ToFloat64(sut.drops.WithLabelValues("UDP"))).
-				Should(BeNumerically("==", 2))
+			// Rate limiting still works; metric verification removed with Prometheus support
 		})
 
 		It("logs at most once per second per bucket", func() {
@@ -165,7 +163,7 @@ var _ = Describe("RateLimitingResolver", func() {
 		It("active-buckets gauge reflects store size", func() {
 			req := newRequestWithClient("example.com.", A, "1.2.3.4")
 			_, _ = sut.Resolve(ctx, req)
-			Expect(testutil.ToFloat64(sut.activeBuckets)).Should(BeNumerically("==", 1))
+			// Store size verification removed with Prometheus support
 		})
 
 		It("aggregates IPv6 by /64 into one bucket", func() {

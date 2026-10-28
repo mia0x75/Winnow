@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 
-	. "github.com/0xERR0R/blocky/log"
+	. "github.com/mia0x75/denyzer/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -308,8 +308,8 @@ var _ = Describe("Common function tests", func() {
 			It("should create SOA with proper nameserver and mailbox", func() {
 				soa := CreateSOAForNegativeResponse(question, blockTTL)
 
-				Expect(soa.Ns).Should(Equal("blocky.local."))
-				Expect(soa.Mbox).Should(Equal("hostmaster.blocky.local."))
+				Expect(soa.Ns).Should(Equal("denyzer.local."))
+				Expect(soa.Mbox).Should(Equal("hostmaster.denyzer.local."))
 			})
 
 			It("should create SOA with standard timing values", func() {

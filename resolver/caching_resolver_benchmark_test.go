@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/0xERR0R/blocky/config"
-	"github.com/0xERR0R/blocky/model"
+	"github.com/mia0x75/denyzer/config"
+	"github.com/mia0x75/denyzer/model"
 
 	"github.com/creasty/defaults"
 	"github.com/miekg/dns"
@@ -49,7 +49,7 @@ func BenchmarkCachingResolverResolve(b *testing.B) {
 
 	ctx := b.Context()
 
-	sut, err := NewCachingResolver(ctx, cfg, config.DNSSEC{}, nil)
+	sut, err := NewCachingResolver(ctx, cfg, config.DNSSEC{})
 	if err != nil {
 		b.Fatal(err)
 	}

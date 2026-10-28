@@ -1737,14 +1737,28 @@ upstream health.
 !!! tip "Docker / Kubernetes liveness probe"
 
     A liveness probe should treat a `NOERROR` response as healthy.
+    The image ships no `dig`, so use the built-in `healthcheck` command
+    instead of shelling out to a DNS client.
     Example for Docker Compose:
 
     ```yaml
     healthcheck:
-      test: ["CMD", "dig", "@127.0.0.1", "-p", "53", "healthcheck.denyzer", "+short", "+tries=1"]
+      test: ["CMD", "/app/denyzer", "healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
+    ```
+
+    The same command works as a Kubernetes liveness probe:
+
+    ```yaml
+    livenessProbe:
+      exec:
+        command: ["/app/denyzer", "healthcheck"]
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
     ```
 
 ## SSL certificate configuration (DoH / TLS listener)
